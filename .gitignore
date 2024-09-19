@@ -1,0 +1,7 @@
+__pycache__/
+data/
+results/
+results_backup/
+results_OLD/
+tb_logs/
+wandb/
