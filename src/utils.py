@@ -23,15 +23,15 @@ def compute_model_params(model):
 
 def get_models(num_models: int = -1, models_to_ignore: list = []):
     available_models = [
-        #"resnet18",
-        #"resnet101",
+        "resnet18",
+        ### "resnet101",
         "alexnet",
         "vgg16",
         "squeezenet",
         "efficientnet",
         "vit",
-        "mobilenet",
-        "swin_transformer",
+        ### "mobilenet",
+        ### "swin_transformer",
     ]
     if num_models == -1:
         return available_models
@@ -46,3 +46,10 @@ def get_models(num_models: int = -1, models_to_ignore: list = []):
 
 def get_all_datasets() -> list:
     return ["food101", "cifar10", "cifar100", "mnist"] 
+
+
+def generate_lr(start_order, end_order, num_samples, seed:int = 42):
+    if seed is not None:
+        np.random.seed(seed)  
+    values = np.logspace(start_order, end_order, num_samples)
+    return values + np.random.rand(num_samples) * 1e-4  

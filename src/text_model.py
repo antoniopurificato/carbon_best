@@ -1,4 +1,9 @@
 import time
+import os
+import csv
+import eco2ai
+import torch 
+from copy import deepcopy
 from transformers import TrainerCallback
 from codecarbon import EmissionsTracker
 from transformers import (
@@ -133,6 +138,12 @@ class CustomCallback(TrainerCallback):
             accuracy = eval_results.get("train_accuracy", None)
             f1_micro = eval_results.get("train_f1_micro", None)
             f1_macro = eval_results.get("train_f1_macro", None)
+
+            eval_results = self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix="val")
+
+            val_accuracy = eval_results.get('val_accuracy', None)
+            val_f1_micro = eval_results.get("val_f1_micro", None)
+            val_f1_macro = eval_results.get("val_f1_macro", None)
             
             # Append the epoch and accuracy to the CSV file
             with open(self.csv_file, mode='a', newline='') as file:
@@ -140,5 +151,9 @@ class CustomCallback(TrainerCallback):
                 writer.writerow([state.epoch, accuracy, "train_accuracy"])
                 writer.writerow([state.epoch, f1_micro, "train_f1_micro"])
                 writer.writerow([state.epoch, f1_macro, "train_f1_macro"])
+                writer.writerow([state.epoch, val_accuracy, "val_accuracy"])
+                writer.writerow([state.epoch, val_f1_micro, "val_f1_micro"])
+                writer.writerow([state.epoch, val_f1_macro, "val_f1_macro"])
+
             
             return control_copy

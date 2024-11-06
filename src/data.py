@@ -3,6 +3,7 @@ import torchvision.transforms as transforms
 from collections import defaultdict
 from torch.utils.data import Subset
 import numpy as np
+from collections import Counter
 
 def get_dataset(
     dataset_name: str,
@@ -104,3 +105,9 @@ def remove_samples(dataset, percentage):
             )
         dataset = Subset(dataset, selected_indices)
     return dataset
+
+def get_classes_distributions(dataset):
+    classes = [label for _, label in dataset]
+    counter = Counter(classes)
+    return list({k: v / len(classes) for k, v in sorted(counter.items())}.values())
+    
