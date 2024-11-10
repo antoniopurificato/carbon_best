@@ -1,30 +1,64 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader, TensorDataset
-import matplotlib.pyplot as plt
+
+
 
 class TransformerModel(pl.LightningModule):
-    def __init__(self, input_size, hidden_size, output_size, num_heads=1,
-                num_layers=2, lr=1e-3):
-        super(TransformerModel, self).__init__()
-        self.save_hyperparameters()
-        self.lr = lr
+    def __init__(self, 
+                 input_size: int, 
+                 hidden_size: int, 
+                 output_size: int, 
+                 num_heads: int = 1, 
+                 num_layers: int = 2):
+        """
+        Initializes the TransformerModel.
 
+        Parameters:
+        -----------
+        input_size : int
+            Input feature size.
+        hidden_size : int
+            Hidden layer size.
+        output_size : int
+            Output feature size.
+        num_heads : int, optional
+            Number of attention heads (default is 1).
+        num_layers : int, optional
+            Number of transformer encoder layers (default is 2).
+        """
+        super(TransformerModel, self).__init__()
+
+        # Transformer Encoder Layer with attention heads
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads)
         self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
+
+        # Fully connected layers
         self.fc = nn.Linear(input_size, hidden_size)
         self.fc_out = nn.Linear(hidden_size, output_size)
+
+        # Dropout and ReLU activation
         self.dropout = nn.Dropout(0.5)
         self.relu = nn.ReLU()
 
-        self.criterion = nn.MSELoss()
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Defines the forward pass of the model.
 
-    def forward(self, x):
+        Parameters:
+        -----------
+        x : Tensor
+            Input tensor with shape (sequence_length, batch_size, input_size).
+
+        Returns:
+        --------
+        Tensor:
+            Output tensor with shape (batch_size, 2), where the first value represents
+            performance and the second value represents emissions.
+        """
         x = self.transformer_encoder(x)
         x = self.fc(x)
+        x = self.relu(x)  # added by Pippo
         x = self.dropout(x)
         x = self.fc_out(x)
 
@@ -33,53 +67,93 @@ class TransformerModel(pl.LightningModule):
 
         return torch.stack([performance, emissions], dim=1)
 
-    def training_step(self, batch, batch_idx):
-        inputs, targets = batch
-        outputs = self(inputs)
-        loss = self.criterion(outputs, targets)
-        self.log('train_loss', loss)
+     def training_step(self, batch, batch_idx):
+        """
+        Defines the training step.
+
+        Parameters:
+        -----------
+        batch : tuple
+            A tuple containing (input_tensor, target_tensor).
+        batch_idx : int
+            Index of the batch.
+
+        Returns:
+        --------
+        Tensor:
+            The loss value for the current batch.
+        """
+        x, y = batch
+        y_hat = self(x)
+        
+        # Calculate loss
+        loss = F.binary_cross_entropy(y_hat, y)  # change according to ViT
+        
+        # Calculate MSE
+        mse_train = F.mse_loss(y_hat, y)
+
+        # Log the loss and MSE
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('train_mse', mse_train, on_step=True, on_epoch=True)
+
+        # Append losses to lists for tracking
+        self.train_losses.append(loss.item())
+        self.train_mses.append(mse_train.item())
+
         return loss
 
     def validation_step(self, batch, batch_idx):
-        inputs, targets = batch
-        outputs = self(inputs)
-        val_loss = self.criterion(outputs, targets)
-        self.log('val_loss', val_loss)
-        return val_loss
+        """
+        Defines the validation step.
+
+        Parameters:
+        -----------
+        batch : tuple
+            A tuple containing (input_tensor, target_tensor).
+        batch_idx : int
+            Index of the batch.
+
+        Returns:
+        --------
+        None
+        """
+        x, y = batch
+        y_hat = self(x)
+
+        # Calculate loss
+        loss = F.binary_cross_entropy(y_hat, y)
+
+        # Calculate MSE
+        mse_val = F.mse_loss(y_hat, y)
+
+        # Log the validation loss and MSE
+        self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('val_mse', mse_val, on_step=True, on_epoch=True)
+
+        # Append losses to lists for tracking
+        self.val_losses.append(loss.item())
+        self.val_mses.append(mse_val.item())
+
+        # Early stopping
+        if loss < self.best_val_loss:
+            self.best_val_loss = loss
+            self.save_best_model()
+
+    def save_best_model(self):
+        """
+        Save the best model state.
+        """
+        torch.save(self.state_dict(), 'best_model.pth')
+        print("Best model saved.")
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
-        return {
-            'optimizer': optimizer,
-            'lr_scheduler': scheduler,
-            'monitor': 'val_loss'
-        }
+        """
+        Configures the optimizer.
 
-
-def plot_loss_and_mse(train_losses, val_losses, train_mses, val_mses):
-    epochs = range(1, len(train_losses) + 1)
-
-    plt.figure(figsize=(14, 6))
-
-    # Plot Loss
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_losses, label='Training Loss')
-    plt.plot(epochs, val_losses, label='Validation Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-
-    # Plot MSE
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, train_mses, label='Training MSE')
-    plt.plot(epochs, val_mses, label='Validation MSE')
-    plt.xlabel('Epochs')
-    plt.ylabel('MSE')
-    plt.title('Training and Validation MSE')
-    plt.legend()
-
-    plt.tight_layout()
-    plt.show()
-    plt.savefig('loss_mse_plot.png')
+        Returns:
+        --------
+        Optimizer:
+            The optimizer for the model.
+        """
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer

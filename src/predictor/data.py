@@ -124,4 +124,3 @@ if __name__ == '__main__':
     #dataset = ArchitectureDataset(remove_features(models_to_features, ['num_parameters']), datasets_to_features, 'CIFAR10')
     dataset = ArchitectureDataset(models_to_features, datasets_to_features)
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
-    print(dataset.entire_data[('vit', 'cifar10', 50, 16, 4.27022004702574e-05)])
