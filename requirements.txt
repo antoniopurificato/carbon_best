@@ -3,7 +3,7 @@ torch==2.4.1
 torchaudio==2.4.1
 torchmetrics==1.4.2
 pytorch-lightning==2.2.2
-codecarbon==2.5.0
+codecarbon==2.8.0
 deepspeed==0.14.1
 pandas==1.4.3
 wandb==0.16.6
