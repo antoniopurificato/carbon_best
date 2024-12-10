@@ -2,6 +2,7 @@ numpy==1.24.2
 torch==2.4.1
 torchaudio==2.4.1
 torchmetrics==1.4.2
+torchvision==0.19.1
 pytorch-lightning==2.2.2
 codecarbon==2.8.0
 mpi4py-mpich
