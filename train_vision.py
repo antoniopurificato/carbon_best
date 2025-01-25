@@ -18,7 +18,7 @@ from src.data import *
 # deepspeed.init_distributed(dist_backend=None, distributed_port=29499)
 
 
-def objective(
+def start_exp(
     d_name: str = "cifar10",
     m_name: str = "resnet18",
     lr: float = 1e-4,
@@ -231,8 +231,7 @@ if __name__ == "__main__":
     # Iterate through all combinations of parameters and run experiments
     for d_name in dataset_name:
         counter += 1
-        learning_rates = generate_lr(args.lr[0], args.lr[1], 10, seed=counter)
-        for lr in learning_rates:
+        for lr in args.lr:
             for samples_to_discard in args.discard_percentage:
                 for batch_size in args.bs:
                     for m_name in model_name:
@@ -240,7 +239,7 @@ if __name__ == "__main__":
                             d = d_name
                             m = m_name
                             s = samples_to_discard
-                            app = objective(
+                            result = start_exp(
                                 d_name=d,
                                 m_name=m,
                                 lr=lr,
