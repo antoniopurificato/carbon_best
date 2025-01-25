@@ -6,8 +6,7 @@ torchvision==0.19.1
 pytorch-lightning==2.2.2
 codecarbon==2.8.0
 mpi4py-mpich
-deepspeed==0.14.1
-#deepspeed to be updated!
+deepspeed==0.16.3
 pandas==1.4.3
 wandb==0.16.6
 eco2ai==0.3.9

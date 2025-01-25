@@ -8,7 +8,6 @@ from collections import Counter
 def get_dataset(
     dataset_name: str,
     num_classes: int = 10,
-    sample_percentage: float = 1.0,
     specific_classes: list = None,
 ):
     if dataset_name == "mnist":
@@ -23,6 +22,23 @@ def get_dataset(
             ]
         )
         dataset = torchvision.datasets.MNIST(
+            root="./data", train=True, download=True, transform=transform
+        )
+        input_channels = 3
+        num_classes = 10
+
+    elif dataset_name == "fashionmnist":
+        transform = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+                transforms.Lambda(
+                    lambda x: x.repeat(3, 1, 1)
+                ),  # Repeat channel to convert 1-channel to 3-channel
+            ]
+        )
+        dataset = torchvision.datasets.FashionMNIST(
             root="./data", train=True, download=True, transform=transform
         )
         input_channels = 3
@@ -72,7 +88,7 @@ def get_dataset(
 
     else:
         raise ValueError(
-            "Dataset not supported. Choose 'mnist', 'cifar10', or 'cifar100'."
+            "Dataset not supported. Choose 'mnist', 'cifar10', 'fashionmnist', or 'cifar100'."
         )
 
     # Select specific classes if specified

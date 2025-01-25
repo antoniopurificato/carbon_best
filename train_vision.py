@@ -9,36 +9,52 @@ from torch.utils.data import DataLoader
 import pandas as pd
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import yaml
-from functools import partial
-import optuna
-
-
 
 from src.vision_model import *
-from src.utils import *
+from src.utils.secondary_utils import *
 from src.data import *
 
-#TODO: automate all the exps
-
-
+# It could be needed for problems with DeepSpeed initialization
 # deepspeed.init_distributed(dist_backend=None, distributed_port=29499)
 
+
 def objective(
-    trial,
     d_name: str = "cifar10",
     m_name: str = "resnet18",
+    lr: float = 1e-4,
+    n_epochs: int = 100,
     samples_to_discard: float = 0.0,
     seed: int = 42,
-    gpu_id: int = 2
+    gpu_id: int = 2,
+    batch_size: int = 64,
 ) -> dict:
+    """
+    Run a training experiment for a given dataset and model configuration.
+
+    Args:
+        d_name (str): Name of the dataset to use (e.g., "cifar10").
+        m_name (str): Name of the model to train (e.g., "resnet18").
+        lr (float): Learning rate for training.
+        n_epochs (int): Number of epochs for training.
+        samples_to_discard (float): Proportion of dataset samples to discard (0.0 to 1.0).
+        seed (int): Random seed for reproducibility.
+        gpu_id (int): ID of the GPU to use.
+        batch_size (int): Batch size for training and evaluation.
+
+    Returns:
+        dict: Dictionary containing experiment results, including accuracy, FLOPs, emissions, and runtime.
+
+    Raises:
+        ValueError: If the experiment has already been executed and results exist.
+    """
     emissions_res = {}
-    n_epochs = int(trial.suggest_float('n_epochs', 10, 100))
-    lr = trial.suggest_float('lr', 1e-6, 1e-1)
 
-
+    # Load dataset and preprocess
     dataset, input_channels, num_classes = get_dataset(d_name)
     original_data_size = len(dataset)
-    dataset = remove_samples(dataset, samples_to_discard)
+    dataset = remove_samples(dataset, samples_to_discard)  # Reduce dataset size
+
+    # Split dataset into train, validation, and test sets
     train_size = int(0.7 * len(dataset))
     dataset, val_dataset = random_split(
         dataset,
@@ -50,52 +66,57 @@ def objective(
         val_dataset,
         [val_size, len(val_dataset) - val_size],
         generator=torch.Generator().manual_seed(seed),
-    ) 
-    train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=10)
+    )
+
+    # Initialize data loaders
+    train_loader = DataLoader(
+        dataset, batch_size=batch_size, shuffle=True, num_workers=10
+    )
     val_loader = DataLoader(
-        val_dataset, batch_size=64, shuffle=False, num_workers=10
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=10
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=64, shuffle=False, num_workers=10
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=10
     )
 
+    # Initialize model
     model = Classifier(model_name=m_name, num_classes=num_classes, lr=lr)
+
+    # Initialize FLOPs profiler
     profiler = FlopsProfiler(model)
 
-    # for n_epochs in epochs:
-    perc_value = int(samples_to_discard*100)
-    exp_name = f"{d_name}_discard_{perc_value}_{str(n_epochs)}_{str(lr)}"
+    # Experiment naming and result folder setup
+    perc_value = int(samples_to_discard * 100)
+    exp_name = f"{d_name}_discard_{perc_value}_{str(batch_size)}_{str(lr)}"
     folder_path = "results/" + m_name
     exp_path = os.path.join(folder_path, exp_name)
 
-    if not os.path.isfile(os.path.join(exp_path,'results.yml')):
+    # Skip if the experiment has already been executed
+    if not os.path.isfile(os.path.join(exp_path, "results.yml")):
         print(f"Experiment: {exp_path}")
         if not os.path.isdir(exp_path):
             if not os.path.isdir(folder_path):
                 os.mkdir(folder_path)
             os.mkdir(exp_path)
 
+        # Configure profiler output
         profiler.output_dir = exp_path
 
+        # Define callbacks and logger
         checkpoint_callback = ModelCheckpoint(monitor="val_loss", mode="min")
-        early_stopping_callback = EarlyExitAccuracy(target_accuracy=0.88)
-        # flops_callback = FLOPsCallback(input_size=(1, input_channels, 224, 224))
         emissions_callback = EmissionsTrackingCallback(exp_path)
-        emissions_eco2ai_callback = SecondTrackerCallback(exp_path)
         logger = CSVLogger(save_dir=folder_path, name=exp_name)
 
+        # Configure PyTorch Lightning trainer
         trainer = pl.Trainer(
             max_epochs=n_epochs,
             accelerator="gpu",
             devices=[gpu_id],
-            callbacks=[
-                checkpoint_callback,
-                early_stopping_callback,
-                emissions_callback,
-                emissions_eco2ai_callback,
-            ],  # flopscallback, emissioncallback
+            callbacks=[checkpoint_callback, emissions_callback],
             logger=logger,
-        )  # per colab accelerator="gpu" if torch.cuda.is_available() else "cpu"
+        )
+
+        # Start emissions tracker
         total_tracker = EmissionsTracker(
             tracking_mode="process",
             log_level="critical",
@@ -104,98 +125,128 @@ def objective(
             api_call_interval=4,
             experiment_id=exp_path,
         )
-        eco2ai_tracker = eco2ai.Tracker(
-            project_name="Env footprint",
-            file_name=f"{exp_path}/emission_eco2ai.csv",
-            cpu_processes="current",
-            measure_period=30,
-            ignore_warnings=True,
-            alpha_2_code="IT",
-        )
-        eco2ai_tracker.start()
         total_tracker.start()
         profiler.start_profile()
 
+        # Measure experiment runtime
         experiment_start_time = time.time()
         trainer.fit(model, train_loader, val_loader)
         experiment_end_time = time.time()
         experiment_time = experiment_end_time - experiment_start_time
 
+        # Evaluate model on test set
         accuracy = trainer.test(model, test_loader)
 
+        # Stop emissions tracking and profiler
         total_emissions = total_tracker.stop()
         profiler.print_model_profile(
             output_file=f"{profiler.output_dir}/train_flops.txt"
         )
-        eco2ai_tracker.stop()
-        emissions_eco2ai = float(pd.read_csv(f"{exp_path}/emission_eco2ai.csv").iloc[0]['CO2_emissions(kg)'])
         profiler.stop_profile()
 
+        # Save experiment results
         emissions_res[exp_path] = {
             "accuracy": accuracy[0]["test_acc"],
-            "num_params": compute_model_params(
-                trainer.model
-            ),
-            "flops": profiler.get_total_flops(), #check
+            "num_params": compute_model_params(trainer.model),
+            "flops": profiler.get_total_flops(),
             "epochs_concluded": trainer.current_epoch,
             "experiment_time": experiment_time,
             "total_emissions": total_emissions,
             "emissions_per_epoch": emissions_callback.emissions_per_epoch,
             "times_per_epoch": emissions_callback.times_per_epoch,
-            "emissions_eco2ai": emissions_eco2ai,
-            "original_data_size" : original_data_size,
-            "modified_data_size" : len(dataset),
+            "original_data_size": original_data_size,
+            "modified_data_size": len(dataset),
         }
 
         with open(os.path.join(exp_path, "results.yml"), "w") as yaml_file:
-            yaml.dump(
-                emissions_res[exp_path], yaml_file, default_flow_style=False
-            )
-        return accuracy[0]["test_acc"]  
+            yaml.dump(emissions_res[exp_path], yaml_file, default_flow_style=False)
+
+        return accuracy[0]["test_acc"]
     else:
-        print(f"Experiment {exp_path} already exists") 
+        print(f"Experiment {exp_path} already exists")
         return ValueError("Experiment already exists")
 
 
-                    
-
-
 if __name__ == "__main__":
-
+    """
+    Main entry point for running multiple experiments with different configurations.
+    """
     parser = argparse.ArgumentParser()
+
+    # Command-line arguments for the script
     parser.add_argument(
         "--dataset",
         type=str,
         nargs="+",
-        default=get_all_datasets(),
+        default=get_all_datasets("vision"),
         help="Dataset to use for training",
     )
     parser.add_argument(
         "--epochs",
         type=int,
         nargs="+",
-        default=[5,10,20,50,100],
+        default=[100],
         help="Number of epochs to train the model",
     )
-    parser.add_argument("--gpu_id", type=int, default=2, help="Id of the GPU")
+    parser.add_argument(
+        "--bs",
+        type=int,
+        nargs="+",
+        default=[16, 32, 64, 128, 256],
+        help="Values of batch size",
+    )
+    parser.add_argument(
+        "--discard_percentage",
+        type=float,
+        nargs="+",
+        default=[1, 0.3, 0.7],
+        help="Values of discard percentage",
+    )
+    parser.add_argument("--gpu_id", type=int, default=0, help="Id of the GPU")
     parser.add_argument("--seed", type=int, default=42, help="Seed value")
     parser.add_argument(
-        "--model", type=str, nargs="+", default=get_models(), help="Name of the model"
+        "--model",
+        type=str,
+        nargs="+",
+        default=get_models("vision"),
+        help="Name of the model",
+    )
+    parser.add_argument(
+        "--lr",
+        type=str,
+        nargs="+",
+        default=[10e-3, 10e-4, 10e-5],
+        help="Learning rate values",
     )
     args = parser.parse_args()
 
+    # Set the random seed for reproducibility
     seed_everything(args.seed)
-    
-    dataset_name=args.dataset
-    model_name=args.model
 
+    dataset_name = args.dataset
+    model_name = args.model
+    epochs = args.epochs
+    counter = 0
+
+    # Iterate through all combinations of parameters and run experiments
     for d_name in dataset_name:
-        for samples_to_discard in [1, .3, .5, .7, .1]:  
-            for m_name in model_name:
-                d = d_name
-                m = m_name
-                s = samples_to_discard
-                study = optuna.create_study()
-                objective = partial(objective, d_name = d, m_name = m, samples_to_discard = s, seed = args.seed, gpu_id = args.gpu_id)
-                study.optimize(objective, n_trials = 15)
-   
+        counter += 1
+        learning_rates = generate_lr(args.lr[0], args.lr[1], 10, seed=counter)
+        for lr in learning_rates:
+            for samples_to_discard in args.discard_percentage:
+                for batch_size in args.bs:
+                    for m_name in model_name:
+                        for epoch in epochs:
+                            d = d_name
+                            m = m_name
+                            s = samples_to_discard
+                            app = objective(
+                                d_name=d,
+                                m_name=m,
+                                lr=lr,
+                                n_epochs=epoch,
+                                samples_to_discard=s,
+                                seed=args.seed,
+                                gpu_id=args.gpu_id,
+                                batch_size=batch_size,
+                            )

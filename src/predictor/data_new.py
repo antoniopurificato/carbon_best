@@ -7,18 +7,20 @@ from pathlib import Path
 import numpy as np
 
 from src.utils.secondary_utils import get_models
-from src.utils.main_utils import *
+from src.utils.main_utils_new import *
 
 class ArchitectureDataset(Dataset):
     def __init__(self, model_dict: dict, data_dict: dict):
         self.model_dict = model_dict
         self.data_dict = data_dict
         self.data_names = {'cifar10' : 'CIFAR10', 'cifar100' : 'CIFAR100',
-        'mnist' : 'MNIST', 'food101' : 'FashionMNIST', 'google_boolq':'google_boolq' ,'stanfordnlp_imdb': 'stanfordnlp_imdb',
-        'dair-ai_emotion' : 'dair-ai_emotion' }
+        'mnist' : 'MNIST', 'food101' : 'food101', 'FashionMNIST': 'FashionMNIST', 'google_boolq':'google_boolq' ,'stanfordnlp_imdb': 'stanfordnlp_imdb',
+        'dair-ai_emotion' : 'dair-ai_emotion', 'ml-1m': 'ML-1M'}
         self.model_names = {'vit' : 'vit_b_16', 'efficientnet' : 'efficientnet_b0',
         'squeezenet' : 'squeezenet1_0', 'resnet18' : 'resnet18',
-        'alexnet' : 'alexnet', 'vgg16' : 'vgg16', 'bert-base-uncased': 'bert-base-uncased', 'roberta_base':'roberta_base'}
+        'alexnet' : 'alexnet', 'vgg16' : 'vgg16', 'bert-base-uncased': 'bert-base-uncased', 'roberta-base':'roberta-base',
+        'microsoft_phi-2':'microsoft_phi-2', 'mistralai_Mistral-7B-v0.3':'mistralai_Mistral-7B-v0.3',
+        'BERT4Rec': 'BERT4Rec' , 'CORE': 'CORE', 'GRU4Rec': 'GRU4Rec', 'SASRec': 'SASRec'}
         self.model_dict = self.process_dict(model_dict)
         self.data_dict = self.process_dict(data_dict)
         self.entire_data = self.obtain_entire_dataset()
@@ -49,19 +51,58 @@ class ArchitectureDataset(Dataset):
             target_keys = ['val_acc','energy_cumulative']
             labels = {k: value[k] for k in target_keys if k in value}
             label_tensors = []
+            max_len = 400  # Maximum length for truncation and padding
 
             for k in target_keys:
-                if isinstance(labels[k], (list, np.ndarray)):
-                    # Convert to tensor and truncate/pad to the first 100 elements
-                    truncated = labels[k][:100]  
-                    label_tensors.append(torch.tensor(truncated, dtype=torch.float32))
-                elif isinstance(labels[k], torch.Tensor):
-                    truncated = labels[k][:100] 
-                    label_tensors.append(truncated.float())
-            
-            label_tensor = torch.stack(label_tensors, dim=-1)
-            label_tensor_norm = (label_tensor - self.label_min) / (self.label_max- self.label_min + 1e-12)
-            
+                if k in labels:
+                    sequence = labels[k]
+
+                    if isinstance(sequence, (list, np.ndarray)):
+                        # Handle the special case where sequence length is 101
+                        if len(sequence) == 101:
+                            sequence = sequence[:100]  # Truncate to 100
+
+                        # Truncate the sequence to max_len (400)
+                        sequence = sequence[:max_len]
+
+                        # Pad the sequence to max_len
+                        padded = np.pad(
+                            sequence,
+                            (0, max(0, max_len - len(sequence))),
+                            constant_values=-1
+                        )
+                        label_tensors.append(torch.tensor(padded, dtype=torch.float32))
+                    elif isinstance(sequence, torch.Tensor):
+                        # Handle the special case where sequence length is 101
+                        if sequence.size(0) == 101:
+                            sequence = sequence[:100]  # Truncate to 100
+
+                        # Truncate/pad to max_len
+                        truncated = sequence[:max_len]
+                        padded = torch.nn.functional.pad(
+                            truncated,
+                            (0, max(0, max_len - truncated.size(0))),
+                            value=-1
+                        )
+                        label_tensors.append(padded.float())
+
+            # Stack label tensors
+            label_tensor = torch.stack(label_tensors, dim=-1) if label_tensors else torch.tensor([], dtype=torch.float32)
+            mask = label_tensor != -1  # Shape: (seq_len, num_labels)
+
+            # Clone the label tensor to preserve original values
+            label_tensor_norm = label_tensor.clone()
+
+            if mask.any() and hasattr(self, 'label_min') and hasattr(self, 'label_max'):
+                # Expand label_min and label_max for broadcasting along the sequence length
+                label_min_expanded = self.label_min.view(1, -1)  # Shape: (1, num_labels)
+                label_max_expanded = self.label_max.view(1, -1)  # Shape: (1, num_labels)
+
+                # Use broadcasting to apply normalization element-wise where the mask is True
+                label_tensor_norm[mask] = (
+                    (label_tensor[mask] - label_min_expanded.expand_as(label_tensor)[mask]) /
+                    (label_max_expanded.expand_as(label_tensor)[mask] - label_min_expanded.expand_as(label_tensor)[mask] + 1e-12)
+                )
 
             # Extract and pad input features
             input_keys = [k for k in value.keys() if k not in target_keys]
@@ -73,13 +114,14 @@ class ArchitectureDataset(Dataset):
             # Create a mask for non-padding values
             padding_mask = tensor_inputs != -1  # Exclude padding values
             range_mask = torch.zeros_like(tensor_inputs, dtype=torch.bool)
-            range_mask[18:118] = True  #avoid normalizing class_distribution since already normalized
+            range_mask[18:119] = True  #avoid normalizing class_distribution since already normalized
 
             # Combine both masks
             mask = padding_mask & ~range_mask
             if mask.any():
                 tensor_inputs[mask] = (tensor_inputs[mask] - self.input_min[mask]) / (
                     self.input_max[mask] - self.input_min[mask] + 1e-8)
+                
             return key, tensor_inputs, label_tensor_norm
     
     def filter_test_data(self, dataset_name: str = 'food101', discard_percentage: int = 50):
@@ -118,23 +160,48 @@ class ArchitectureDataset(Dataset):
         self.input_min = torch.min(all_inputs.masked_fill(~mask, float('inf')), dim=0).values
         self.input_max = torch.max(all_inputs.masked_fill(~mask, float('-inf')), dim=0).values
 
-        all_labels = []
+        label_masks = []  # Collect label masks
+        all_labels=[]
 
-        # Iterate through valid_data and extract the slices for each target key
+        # Iterate through valid_data and pad all labels to 100
         for key, value in self.valid_data.items():
-            labels = [
-                torch.tensor(value[k], dtype=torch.float32)[:100]
-                for k in target_keys if k in value
-            ]
+            labels = []
+            masks = []  # To store masks for each label field
+            for k in target_keys:
+                if k in value:
+                    # Handle the special case where sequence length is 101
+                    max_len = 400
+                    sequence = value[k]
+
+                    if len(sequence)>400:
+                        sequence = sequence[:400]
+
+                    if len(sequence) == 101:
+                        # Truncate the sequence to 100
+                        sequence = sequence[:100]
+                    
+                    # Pad the sequence to 400
+                    padded = np.pad(
+                        sequence,
+                        (0, max(0, max_len - len(sequence))),
+                        constant_values=-1
+                    )
+                    tensor_label = torch.tensor(padded, dtype=torch.float32)
+                    labels.append(tensor_label)
+                    masks.append(tensor_label != -1)  # Create a mask for non-padding values
             if labels:
                 stacked_labels = torch.stack(labels, dim=-1)  # Shape: (seq_len, num_targets)
-                all_labels.append(stacked_labels)
+                stacked_masks = torch.stack(masks, dim=-1)  # Corresponding mask
+                all_labels.append(stacked_labels)  # Append the tensor to the list
+                label_masks.append(stacked_masks)
 
-        # Concatenate all labels if not empty
+        # Concatenate all labels and masks if the list is not empty
         if all_labels:
             all_labels = torch.cat(all_labels, dim=0)  # Combine all samples
-            self.label_min = all_labels.min(dim=0).values  # Per-feature min
-            self.label_max = all_labels.max(dim=0).values  # Per-feature max
+            label_masks = torch.cat(label_masks, dim=0)  # Combine all masks
+            # Compute min and max values for non-padding elements
+            self.label_min = torch.min(all_labels.masked_fill(~label_masks, float('inf')), dim=0).values
+            self.label_max = torch.max(all_labels.masked_fill(~label_masks, float('-inf')), dim=0).values
         else:
             self.label_min = torch.tensor([])  # Empty tensor if no valid data
             self.label_max = torch.tensor([])
@@ -151,10 +218,13 @@ class ArchitectureDataset(Dataset):
             label_shapes = []
 
             # Determine the expected target length based on the model name
-            model_name = key[0]  # Assuming the first element of `key` is the model name
-            if model_name in ["bert-base-uncased", "roberta_base"]:
+            model_name = key[0]  
+            if model_name in ["bert-base-uncased", "roberta-base","microsoft_phi-2", "mistralai_Mistral-7B-v0.3"]:
                 expected_length = 5
                 check_condition = lambda x: len(x) == expected_length
+            elif model_name in ["BERT4Rec", "CORE", "GRU4Rec", "SASRec"]:
+                expected_length = 400
+                check_condition = lambda x: len(x) >= expected_length
             else:
                 expected_length = 100
                 check_condition = lambda x: len(x) >= expected_length
@@ -277,36 +347,7 @@ class ArchitectureDataset(Dataset):
         combined_padded_data.extend(one_hot_activation)
 
         return torch.tensor(combined_padded_data, dtype=torch.float32)
-    
-    def get_exp_with_max_conv_layers(self):
-        max_length = 0
-        max_exp_name = None
 
-        for exp_name, data_item in self.valid_data.items():
-            conv_layers = data_item.get('conv_layers_NEW', [])
-            if isinstance(conv_layers, list):
-                total_length = 0
-                for sub_entry in conv_layers:
-                    if isinstance(sub_entry, dict):
-                        stripped_values = [v for k, v in sub_entry.items() if k != 'type']
-                        for val in stripped_values:
-                            if isinstance(val, tuple):
-                                total_length += len(val)
-                            elif isinstance(val, list):
-                                total_length += len(val)
-                            else:
-                                total_length += 1
-                    elif isinstance(sub_entry, tuple):
-                        total_length += len(sub_entry)
-                    else:
-                        total_length += 1
-
-                if total_length > max_length:
-                    max_length = total_length
-                    max_exp_name = exp_name
-
-        print(f"Experiment with max 'conv_layers': {max_exp_name} (Length: {max_length})")
-        return max_exp_name
 
     def compute_max_padding(self):
         """
@@ -347,7 +388,7 @@ class ArchitectureDataset(Dataset):
 
 
     def obtain_precomputed_results(self, model_name:str, dataset_name:str,
-                                   exp_name:str='discard_50_16_4.27022004702574e-05'):
+                                   exp_name:str):
         
         NOT_FOUND = False
         results_folder = Path(load_yaml_exp_folder()[2])                                                                                   
@@ -356,8 +397,8 @@ class ArchitectureDataset(Dataset):
         #print(f"Checking folder: {folder_name}")
 
         try:
-            if model_name in ["bert-base-uncased", "roberta_base"]:
-                # For bert-base-uncased and roberta_base, read from training_log.csv
+            if model_name in ["bert-base-uncased", "roberta-base", "microsoft_phi-2", "mistralai_Mistral-7B-v0.3"]:
+                # For bert-base-uncased and roberta-base, read from training_log.csv
                 metrics_df = pd.read_csv(f'{folder_name}/epochs_results/training_log.csv')
                 val_accuracy_df = metrics_df[metrics_df['Metric_Name'] == 'val_accuracy']
                 # Extract 'Value' column as a list
@@ -365,14 +406,21 @@ class ArchitectureDataset(Dataset):
                 #print(metrics)
             else:
                 # Standard path for val_acc
-                try:
-                    metrics = pd.read_csv(f'{folder_name}/version_0/metrics.csv')['val_acc'].dropna().values.tolist()
-                except FileNotFoundError:
-                    metrics = pd.read_csv(f'{folder_name}/version_1/metrics.csv')['val_acc'].dropna().values.tolist()
+                if model_name in ["BERT4Rec", "CORE", "GRU4Rec", "SASRec"]:
+                    try:
+                        metrics = pd.read_csv(f'{folder_name}/version_0/metrics.csv')['val_NDCG_@10/dataloader_idx_0'].dropna().values.tolist()
+                    except FileNotFoundError:
+                        metrics = pd.read_csv(f'{folder_name}/version_1/metrics.csv')['val_NDCG_@10/dataloader_idx_0'].dropna().values.tolist()
+                else:        
+                    try:
+                        metrics = pd.read_csv(f'{folder_name}/version_0/metrics.csv')['val_acc'].dropna().values.tolist()
+                    except FileNotFoundError:
+                        metrics = pd.read_csv(f'{folder_name}/version_1/metrics.csv')['val_acc'].dropna().values.tolist()
 
         except FileNotFoundError:
                 NOT_FOUND = True
                 print(f'No metrics found for {model_name} on {dataset_name} with {exp_name}')
+
         if not NOT_FOUND:
             emissions_codecarbon = pd.read_csv(f'{folder_name}/emissions.csv')['emissions'].values.tolist()
             energy=pd.read_csv(f'{folder_name}/emissions.csv')['energy_consumed'].values.tolist()
@@ -389,55 +437,58 @@ class ArchitectureDataset(Dataset):
         return [self.pad_single_sample(data_item) for data_item in self.valid_data.values()]
 
     def validate_padded_output(self):
-        
-        first_key = next(iter(self.valid_data))  # Get the first data item key
-        padded_outputs = self.pad_sequence()  # Get all padded outputs
-        padded_output = padded_outputs[0]  # First padded output
-        data_item = self.entire_data[first_key]  # Original data item
+        # Display the first 20 keys in valid_data
+        print("\n=== First Keys in valid_data ===")
+        for i, key in enumerate(self.valid_data.keys()):
+            if i >=2 :  
+                break
+            print(f"Validating key: {key}")
 
-        # Validate if all padded outputs have the same shape
-        first_shape = padded_output.shape
-        consistent_shape = True
+            # Get all padded outputs and the specific padded output for this key
+            padded_outputs = self.pad_sequence()  # Get all padded outputs
+            padded_output = padded_outputs[i]  # Corresponding padded output for the current key
+            data_item = self.valid_data[key]  # Original data item
 
-        for i, output in enumerate(padded_outputs):
-            if output.shape != first_shape:
-                consistent_shape = False
-                print(f"Mismatch in shape for padded output {i}: Expected {first_shape}, got {output.shape}")
+            # Validate if all padded outputs have the same shape
+            first_shape = padded_outputs[0].shape
+            consistent_shape = all(output.shape == first_shape for output in padded_outputs)
 
-        if consistent_shape:
-            print("All padded outputs have the same shape.")
-
-        # Validate individual fields
-        print("\n=== Validation of Individual Fields ===")
-        index = 0
-
-        for field, max_len in self.max_padding.items():
-            if field in data_item:
-                raw_value = data_item[field]
-                if isinstance(raw_value, list):
-                    padded_value = padded_output[index:index + max_len]
-                    index += max_len
-                    print(f"{field}:")
-                    print(f"Raw: {padded_value} (len={len(raw_value)})")  
-                    print(f" Padded: {padded_value} (len={len(padded_value)})") 
-                elif isinstance(raw_value, torch.Tensor):
-                    raw_value = raw_value.cpu().numpy().tolist()
-                    padded_value = padded_output[index:index + max_len]
-                    index += max_len
-                    print(f"{field}:")
-                    print(f"  Raw: {raw_value} (len={len(raw_value)})")
-                    print(f"  Padded: {padded_value} (len={len(padded_value)})")
-                else:
-                    padded_value = padded_output[index]
-                    index += 1
-                    print(f"{field}:")
-                    print(f"  Raw: {raw_value}")
-                    print(f"  Padded: {padded_value}")
+            if not consistent_shape:
+                print(f"Mismatch in shape detected for key {key}. Expected {first_shape}.")
             else:
-                padded_value = padded_output[index:index + max_len]
-                index += max_len
-                print(f"{field}:")
-                print(f"  Not present in data. Padded: {padded_value[:5]} (len={len(padded_value)})")
+                print("All padded outputs have the same shape.")
+
+            # Validate individual fields
+            print("\n=== Validation of Individual Fields ===")
+            index = 0
+
+            for field, max_len in self.max_padding.items():
+                if field in data_item:
+                    raw_value = data_item[field]
+                    if isinstance(raw_value, list):
+                        padded_value = padded_output[index:index + max_len]
+                        index += max_len
+                        print(f"{field}:")
+                        print(f"  Raw: {raw_value[:105]} (len={len(raw_value)})")  
+                        print(f"  Padded: {padded_value[:105]} (len={len(padded_value)})") 
+                    elif isinstance(raw_value, torch.Tensor):
+                        raw_value = raw_value.cpu().numpy().tolist()
+                        padded_value = padded_output[index:index + max_len]
+                        index += max_len
+                        print(f"{field}:")
+                        print(f"  Raw: {raw_value[:105]} (len={len(raw_value)})")
+                        print(f"  Padded: {padded_value[:105]} (len={len(padded_value)})")
+                    else:
+                        padded_value = padded_output[index]
+                        index += 1
+                        print(f"{field}:")
+                        print(f"  Raw: {raw_value}")
+                        print(f"  Padded: {padded_value}")
+                else:
+                    padded_value = padded_output[index:index + max_len]
+                    index += max_len
+                    print(f"{field}:")
+                    print(f"  Not present in data. Padded: {padded_value[:30]} (len={len(padded_value)})")
 
     def obtain_entire_dataset(self):
         final_data = {}
@@ -459,7 +510,7 @@ class ArchitectureDataset(Dataset):
                     parts = experiment_folder.name.split('_')
 
                     # Determine how to extract dataset_name and other parameters
-                    if model_name in ["bert-base-uncased", "roberta_base"]:
+                    if model_name in ["bert-base-uncased", "roberta-base","microsoft_phi-2", "mistralai_Mistral-7B-v0.3"]:
                         parts = experiment_folder.name.split('_')
 
                         # Ensure the folder has the expected structure
@@ -468,14 +519,17 @@ class ArchitectureDataset(Dataset):
                         
                         dataset_name = f"{parts[0]}_{parts[1]}"
                         
+                        
                         # Validate each part before conversion
                         if parts[2] != "discard":
                             raise ValueError(f"Unexpected value in parts[2]: {parts[2]} in folder {experiment_folder.name}")
                         
-                        discard_percentage = int(parts[3])  # Convert parts[3] to int (this is safe now)
+                        discard_percentage = int(parts[3]) # Convert parts[3] to int (this is safe now)
+                        discard_percentage_forcomp= discard_percentage 
                         batch_size = 1  # Default batch size for these models
                         learning_rate = float(parts[4])  # Convert parts[4] to float
                         exp_name=f"discard_{discard_percentage}_{learning_rate}"
+                        train_perc=0.8
                     else:
                         parts = experiment_folder.name.split('_')
                         if len(parts) < 5:
@@ -483,18 +537,28 @@ class ArchitectureDataset(Dataset):
 
                         dataset_name = parts[0]
                         discard_percentage = int(parts[2])
+                        train_perc=0.7
+                        if model_name in ["BERT4Rec", "CORE", "GRU4Rec", "SASRec"]:
+                            discard_percentage_forcomp=discard_percentage
+                        else: 
+                            discard_percentage_forcomp= 100-discard_percentage 
+ 
                         batch_size = int(parts[3])
                         learning_rate = float(parts[4])
                         exp_name=f"discard_{discard_percentage}_{batch_size}_{learning_rate}"
+        
 
                     keys = (model_name, dataset_name, discard_percentage, batch_size, learning_rate)
+
+                    if dataset_name not in self.data_names:
+                        raise KeyError(f"Dataset name {dataset_name} not found in self.data_names.")
 
 
                     final_data[keys] = {}
                     final_data[keys]['FLOPS'] = extract_flops_from_text(experiment_folder) if experiment_folder.exists() else -1
-                    final_data[keys]['depth'], _, final_data[keys]['params'] = extract_architecture_metrics(experiment_folder) if experiment_folder.exists() else -1  #latency ignored because we have few data
+                    final_data[keys]['depth'], final_data[keys]['params'] = extract_architecture_metrics(experiment_folder) if experiment_folder.exists() else -1  #latency ignored because we have few data
 
-                    final_data[keys]['discard_percentage'] = discard_percentage
+                    final_data[keys]['discard_percentage'] = discard_percentage_forcomp
                     final_data[keys]['batch_size'] = batch_size
                     final_data[keys]['learning_rate'] = learning_rate
 
@@ -504,12 +568,32 @@ class ArchitectureDataset(Dataset):
                         model_name=model_name, dataset_name=dataset_name,
                         exp_name=exp_name
                     )
+
                     final_data[keys]['val_acc'], final_data[keys]['emissions_codecarbon'],final_data[keys]['energy'], final_data[keys]['emissions_eco2ai'] = res
                     final_data[keys]['energy_cumulative'] = torch.cumsum(final_data[keys]['energy'], dim=0)
-                    
-                    final_data[keys].update(self.data_dict[self.data_names[dataset_name]]) #dataset info dict 
-                    layers_info= parse_layers_info(experiment_folder) if experiment_folder.exists() else -1
-                    
+
+                    final_data[keys].update(self.data_dict[self.data_names[dataset_name]]) #dataset info dict
+                    final_data[keys]['num_val_examples'] = -1
+
+                    # Check if `num_train_examples` is empty
+                    if not final_data[keys]['num_train_examples']:
+                        final_data[keys]['num_train_examples']=-1
+                    else:
+                        # Make copies of the original data to avoid overwriting
+                        num_train_examples_copy = final_data[keys]['num_train_examples']
+
+                        # Perform calculations on the copies
+                        final_data[keys]['num_val_examples'] = (
+                            num_train_examples_copy * (100 - discard_percentage_forcomp) / 100 * (1 - train_perc)
+                        )
+                        final_data[keys]['num_train_examples'] = (
+                            num_train_examples_copy * (100 - discard_percentage_forcomp) / 100 * train_perc
+                        )
+                    if model_name in ["BERT4Rec", "CORE", "GRU4Rec", "SASRec"]:
+                        num_users_copy= final_data[keys]['num_users']
+                        final_data[keys]['num_users']=num_users_copy*(100-discard_percentage_forcomp)/100
+
+                    layers_info = parse_layers_info(experiment_folder) if experiment_folder.exists() else -1
                     for k, v in layers_info.items():
                         final_data[keys][k] = v
 
@@ -518,12 +602,17 @@ class ArchitectureDataset(Dataset):
                     del final_data[keys]['emissions_eco2ai']
                     del final_data[keys]['emissions_codecarbon']
                     del final_data[keys]['energy']
+                    del final_data[keys]['num_test_examples']
+                    for keys in final_data.keys():
+                        final_data[keys].pop('task', None)
                 
                 except Exception as e:
                     print(f"Error processing folder {experiment_folder}: {e}. Skipped experiment")
                     if keys in final_data:  # Ensure incomplete entries are removed
                          del final_data[keys]
                     continue
+
+                
 
         return final_data
 
@@ -537,7 +626,7 @@ if __name__ == '__main__':
        # Initialize full dataset
     full_dataset = ArchitectureDataset(models_to_features, datasets_to_features)
     #full_dataset.get_observation_with_min_label()
-    #full_dataset.validate_padded_output()
+    full_dataset.validate_padded_output()
 
     # Define proportions for training and validation
     val_split_ratio = 0.2  # 20% for validation
@@ -546,11 +635,12 @@ if __name__ == '__main__':
 
     # Split dataset
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+
     
 
     # Initialize data loaders
-    train_dataloader = DataLoader(train_dataset, batch_size=3, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=3, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 
     # Verify train and validation datasets
     print(f"Training dataset size: {len(train_dataset)}")
@@ -561,11 +651,12 @@ if __name__ == '__main__':
         if batch_idx == 0:
 
             print(f"Batch {batch_idx}:")
+            print(f"key: {key}")
             # Check and print the shape of the inputs
             print(f"  Inputs shape: {inputs.shape}")
+            torch.set_printoptions(threshold=torch.inf)
             print(f'Input:{inputs} ')
             # Check and print the shapes of the labels
             print (f'labels shape {labels.shape}')
             #for label_idx, label in enumerate(labels):
               #  print(f"  Label {label_idx} shape: {label.shape}, label {label}, unique: {len(torch.unique(label))}")
-

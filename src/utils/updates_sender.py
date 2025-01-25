@@ -1,8 +1,6 @@
-import time
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
 import os
 
 def get_experiment_ids(path):
@@ -30,7 +28,6 @@ def send_email(subject, body, recipient_email):
     sender_email = "purificatoantonio6@gmail.com"
     password = "mhzw ypqq suuh ulgm"
     
-    # Configura l'email
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = recipient_email
