@@ -414,7 +414,7 @@ def main():
     model_names = args.model
 
     if args.huggingface_key == "NA":
-        raise ValueError("Insert a valid HuggingFace key! {args.huggingface_key} is not valid!")
+        raise ValueError(f"Insert a valid HuggingFace key! {args.huggingface_key} is not valid!")
     login(args.huggingface_key)
 
     # Train models for all combinations of hyperparameters
