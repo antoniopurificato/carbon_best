@@ -39,11 +39,12 @@ mkdir results
 - To create the *vision* knowledge base use the following command:
 ``python3 train_vision.py --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED --bs [BATCH_SIZE_VALUES] -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]``
 
-- To create the *textual* knowledge base use the following command:
+- To create the *textual* knowledge base use the following command, **remember to insert a valid HuggingFace key!**:
 
-``python3 train_text.py --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]``
+``python3 train_text.py --huggingface_key KEY --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]``
 
 The [ITEM] notation is used when you can insert more than 1 value for the corresponding ITEM.
 
 If you run the experiments without adding arguments, it will create the entire knowledge base, as described in the paper (it could take months to complete all the exps).
 
+- To create the *recommendation systems* knowledge base enter in the `recommendation` folder and follow the steps of the `README.md` file you can find in that folder.

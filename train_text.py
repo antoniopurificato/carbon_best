@@ -20,6 +20,7 @@ from deepspeed.profiling.flops_profiler import FlopsProfiler
 from codecarbon import EmissionsTracker
 from peft import LoraConfig, get_peft_model, TaskType
 from peft import prepare_model_for_kbit_training
+from huggingface import login
 
 from src.utils.secondary_utils import *
 from src.text_model import *
@@ -389,6 +390,7 @@ def main():
     )
     parser.add_argument("--model", default=get_models("text"), nargs="+", type=str)
     parser.add_argument("--gpu_id", default="0", type=str)
+    parser.add_argument("--huggingface_key", type=str, default = "NA", help="HuggingFace key to download the models.")
 
     # Add arguments for discard percentage and learning rate
     parser.add_argument(
@@ -410,6 +412,10 @@ def main():
     gpu_id = args.gpu_id
     dataset_name = args.dataset
     model_names = args.model
+
+    if args.huggingface_key == "NA":
+        raise ValueError("Insert a valid HuggingFace key! {args.huggingface_key} is not valid!")
+    login(args.huggingface_key)
 
     # Train models for all combinations of hyperparameters
     for samples_percentage in args.discard_percentage:

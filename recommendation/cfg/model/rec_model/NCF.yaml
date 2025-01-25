@@ -1,0 +1,8 @@
+name: NCF
+
+mlp_emb_size: 8
+mf_emb_size: 8
+layers: [32,16,8]
+
+^/step_routing:
+  model_input_from_batch: ["uid", "out_sid"]

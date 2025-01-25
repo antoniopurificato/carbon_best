@@ -1,0 +1,20 @@
++data_params: data_cfg
+
++model: model
+
+#EXPERIMENT PARAMETERS - NOT SAVED AS PART OF THE CONFIGURATION
+__exp__:
+    name: Real_Runs
+    #+wandb: wandb #Emb_size_beauty #27_1_lookback_ml-1m #provaCaser #name of the experiment, optional, default = "experiment_name"
+    # project_folder: ../ #project folder, used to locate folders, optional, default = "../"
+    # key_len: 16 #Length of experiment key, optional, default = 16
+    # key_prefix: "" #Prefix for experiment key, optional, default = ""
+    # __imports__: #imports needed for config preparation (e.g. type casting)
+    #   - torchvision
+    #   - easy_data
+    #   - numpy as np #" as " will be recognized
+    #   - name: pandas #" as " will be recognized
+    #     fromlist:
+    #       - DataFrame
+    #     as:
+    #       - DF

@@ -1,0 +1,8 @@
+£batch_size: 
+  default: 128 #2048
+  values: [16, 32, 64, 128, 256] #the batch size of the dataset
+/num_workers: 1
+# shuffle: True
+/persistent_workers: False
+/pin_memory: False
+#multiprocessing_context: fork #if on MPS you get RuntimeError: _share_filename_: only available on CPU

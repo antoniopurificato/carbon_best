@@ -1,0 +1,36 @@
+name: GRU4Rec
+
+layers: [100]       # number of layers in the network
+
+dropout_p_embed: 0.0
+dropout_p_hidden: 0.0
+embedding: 0
+constrained_embedding: True
+
+# loss: cross-entropy
+# batch_size: 64 #TODO: check
+#learning_rate: 0.05
+#momentum: 0.0
+#sample_alpha: 0.75
+# n_sample: 2048 TODO: check
+# n_epochs: 10 TODO: check
+# bpreg: 1.0
+# elu_param: 1.0
+# logq: 0.0
+/^step_routing:
+  model_input_from_batch: ["in_sid", "out_sid"]
+  loss_input_from_batch:
+    target: relevance
+    #out_data: out_sid
+  loss_input_from_model_output:
+    input: null
+  metrics_input_from_batch:
+    NDCG:
+      relevance: relevance
+    MRR:
+      relevance: relevance
+  metrics_input_from_model_output:
+    NDCG:
+      scores: null
+    MRR:
+      scores: null

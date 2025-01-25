@@ -1,0 +1,7 @@
+name: LightGCN
+
+emb_size: 64
+num_layers: 1
+
+^/step_routing:
+  model_input_from_batch: ["uid", "out_sid"]

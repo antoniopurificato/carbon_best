@@ -1,0 +1,16 @@
+name: HGN
+
+lookback: ${data_params.dataset_params.lookback}  #length of the sequence
+emb_size: [32, 64, 128, 256, 512]  #dimension of latent dimension
+
+^/step_routing:
+  model_input_from_batch: ["in_sid", "out_sid", "uid"]
+  loss_input_from_model_output:
+    input: null
+
+__global__:
+  data_params.dataset_params.keep_last.train: 1
+  data_params.dataset_params.keep_last.val: null
+  data_params.dataset_params.keep_last.test: null
+  data_params.dataset_params.stride: 10
+  # data_params.dataset_params.simultaneous_lookforward: 3 #the simultaneous lookforward of the dataset

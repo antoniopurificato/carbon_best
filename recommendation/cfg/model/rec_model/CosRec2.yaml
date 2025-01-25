@@ -1,0 +1,15 @@
+name: CosRec2
+
+emb_size: 8 #50
+block_dims: [16,32] #[128, 256]
+fc_dim: 24 #150
+act_fc: Tanh
+dropout_rate: 0.5
+
+^/step_routing:
+  model_input_from_batch: ["in_sid", "out_sid", "uid"]
+
+# __global__:
+#   data_params.collator_params.keep_last.train: 1
+#   data_params.collator_params.keep_last.val: null
+#   data_params.collator_params.keep_last.test: null

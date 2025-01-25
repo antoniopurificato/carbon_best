@@ -1,0 +1,17 @@
+name: Caser2
+
+lookback: ${data_params.dataset_params.lookback}   #length of the sequence
+emb_size: 16   #dimension of latent dimension
+num_ver_filters: 2   #number of vertical filters
+num_hor_filters: 2   #number of horizontal filters
+act_conv: Tanh #activation function of convolutional layer (i.e., phi_c in paper)
+act_fc: Tanh  #activation function of fully connected layer (i.e., phi_a in paper)
+drop_rate: 0.5 #dropout rate
+
+^/step_routing:
+  model_input_from_batch: ["in_sid", "out_sid", "uid"]
+
+# __global__:
+#   data_params.collator_params.keep_last.train: 1
+#   data_params.collator_params.keep_last.val: null
+#   data_params.collator_params.keep_last.test: null
