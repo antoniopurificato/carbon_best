@@ -34,14 +34,20 @@ mkdir results
 
 - Install the required libraries:
 
-``pip3 install -r requirements.txt``
+```
+pip3 install -r requirements.txt
+```
 
 - To create the *vision* knowledge base use the following command:
-``python3 train_vision.py --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED --bs [BATCH_SIZE_VALUES] -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]``
+```
+python3 train_vision.py --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED --bs [BATCH_SIZE_VALUES] -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]
+```
 
 - To create the *textual* knowledge base use the following command, **remember to insert a valid HuggingFace key!**:
 
-``python3 train_text.py --huggingface_key KEY --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]``
+```
+python3 train_text.py --huggingface_key KEY --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]
+```
 
 The [ITEM] notation is used when you can insert more than 1 value for the corresponding ITEM.
 
