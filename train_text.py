@@ -405,9 +405,9 @@ def main():
         help="Learning rate values",
     )
     parser.add_argument("--seed", default=42, type=int)
-    seed_everything(args.seed)
 
     args = parser.parse_args()
+    seed_everything(args.seed)
     dataset_name = args.dataset
     model_names = args.model
 
