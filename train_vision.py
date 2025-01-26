@@ -44,8 +44,6 @@ def start_exp(
     Returns:
         dict: Dictionary containing experiment results, including accuracy, FLOPs, emissions, and runtime.
 
-    Raises:
-        ValueError: If the experiment has already been executed and results exist.
     """
     emissions_res = {}
 
@@ -164,7 +162,6 @@ def start_exp(
         return accuracy[0]["test_acc"]
     else:
         print(f"Experiment {exp_path} already exists")
-        return ValueError("Experiment already exists")
 
 
 if __name__ == "__main__":
