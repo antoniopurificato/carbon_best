@@ -407,6 +407,8 @@ def main():
         default=[10e-3, 10e-4, 10e-5],
         help="Learning rate values",
     )
+    parser.add_argument("--seed", default=42, type=int)
+    seed_everything(args.seed)
 
     args = parser.parse_args()
     gpu_id = args.gpu_id
@@ -450,6 +452,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # Set seed for reproducibility
-    seed_everything(42)
     main()
