@@ -213,7 +213,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--lr",
-        type=str,
+        type=float,
         nargs="+",
         default=[10e-3, 10e-4, 10e-5],
         help="Learning rate values",
