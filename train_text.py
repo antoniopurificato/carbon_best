@@ -386,15 +386,16 @@ def main():
     parser.add_argument(
         "--dataset", default=get_all_datasets("text"), nargs="+", type=str
     )
+    
     parser.add_argument("--model", default=get_models("text"), nargs="+", type=str)
     parser.add_argument("--huggingface_key", type=str, default = "NA", help="HuggingFace key to download the models.")
 
     # Add arguments for discard percentage and learning rate
     parser.add_argument(
         "--discard_percentage",
-        type=int,
+        type=float,
         nargs="+",
-        default=[70, 30, 0],
+        default=[0.7, 0.3, 0],
         help="Values of discard percentage",
     )
     parser.add_argument(
@@ -404,7 +405,8 @@ def main():
         default=[10e-3, 10e-4, 10e-5],
         help="Learning rate values",
     )
-    parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument("--epochs", default=5, type=int, help="Number of epochs")
+    parser.add_argument("--seed", default=42, type=int, help="Seed for reproducibility")
 
     args = parser.parse_args()
     seed_everything(args.seed)
@@ -413,7 +415,7 @@ def main():
 
     if args.huggingface_key == "NA":
         raise ValueError(f"Insert a valid HuggingFace key! {args.huggingface_key} is not valid!")
-    login(args.huggingface_key)
+    login(token=args.huggingface_key)
 
     # Train models for all combinations of hyperparameters
     for samples_percentage in args.discard_percentage:
@@ -426,7 +428,7 @@ def main():
                     )
                     train_reduced_dataset, validation_reduced_dataset = (
                         remove_percentage_of_samples(
-                            train_dataset, val_dataset, samples_percentage
+                            train_dataset, val_dataset, samples_percentage * 100
                         )
                     )
 
@@ -442,7 +444,7 @@ def main():
                         samples_percentage,
                         datas,
                         learning_rate=lr,
-                        num_epochs=5,
+                        num_epochs=args.epochs,
                     )
 
 
