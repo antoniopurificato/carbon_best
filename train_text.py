@@ -185,7 +185,6 @@ def train_model(
     dataset_name: str,
     learning_rate: float = 2e-4,
     num_epochs: int = 2,
-    gpu_id: str = "0",
 ):
     """
     Trains a model using the provided datasets and configuration.
@@ -201,7 +200,6 @@ def train_model(
         dataset_name (str): Name of the dataset.
         learning_rate (float): Learning rate for training.
         num_epochs (int): Number of training epochs.
-        gpu_id (str): GPU ID to use for training.
 
     Returns:
         dict: Evaluation results.
@@ -389,7 +387,6 @@ def main():
         "--dataset", default=get_all_datasets("text"), nargs="+", type=str
     )
     parser.add_argument("--model", default=get_models("text"), nargs="+", type=str)
-    parser.add_argument("--gpu_id", default="0", type=str)
     parser.add_argument("--huggingface_key", type=str, default = "NA", help="HuggingFace key to download the models.")
 
     # Add arguments for discard percentage and learning rate
@@ -411,7 +408,6 @@ def main():
     seed_everything(args.seed)
 
     args = parser.parse_args()
-    gpu_id = args.gpu_id
     dataset_name = args.dataset
     model_names = args.model
 
@@ -447,7 +443,6 @@ def main():
                         datas,
                         learning_rate=lr,
                         num_epochs=5,
-                        gpu_id=gpu_id,
                     )
 
 
