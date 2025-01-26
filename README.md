@@ -40,13 +40,13 @@ pip3 install -r requirements.txt
 
 - To create the *vision* knowledge base use the following command:
 ```
-python3 train_vision.py --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED --bs [BATCH_SIZE_VALUES] -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]
+python3 train_vision.py --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --seed SEED --bs [BATCH_SIZE_VALUES] --discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]
 ```
 
 - To create the *textual* knowledge base use the following command, **remember to insert a valid HuggingFace key!**:
 
 ```
-python3 train_text.py --huggingface_key KEY --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU -- discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]
+python3 train_text.py --huggingface_key KEY --dataset [DATASETS_NAMES] --model [MODEL_NAMES] --epochs [NUM_EPOCHS] --gpu_id ID_OF_THE_GPU --discard_percentage [DISCARD_PERCENTAGE_VALUES] --lr [LR_VALUES]
 ```
 
   Warning! If you have multiple GPUs HuggingFace is having some issues. The only solution we were able to find out was to put `CUDA_VISIBLE_DEVICES=2` before the previous command, i.e., `CUDA_VISIBLE_DEVICES=2 python3 train_text.py ...`. 
