@@ -205,12 +205,12 @@ def train_model(
         dict: Evaluation results.
     """
     # Prepare unique experiment directory structure
-    dataset_name = dataset_name.replace("/", "_")
-    model_name = model_name.replace("/", "_")
+    modified_dataset_name = dataset_name.replace("/", "_")
+    modified_model_name = model_name.replace("/", "_")
 
     emissions_res = {}
-    exp_name = f"{dataset_name}_discard_{perc_value}_{str(learning_rate)}"
-    folder_path = "results/" + str(model_name)
+    exp_name = f"{modified_dataset_name}_discard_{perc_value}_{str(learning_rate)}"
+    folder_path = "results/" + str(modified_model_name)
     exp_name = os.path.join(folder_path, exp_name)
 
     # Check if results already exist, skip if they do
