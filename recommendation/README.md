@@ -37,7 +37,7 @@ cd ../ntb
 ```
 
 ```
-python3 main_multi.py --lr [LEARNING_RATE_VALUES] --bs [BATCH_SIZE_VALUES] --ds [DATASET_NAME] --discard_percentage [DISCARD_PERCENTAGE] --model [MODEL_NAME]
+python3 main_multi.py --lr [LEARNING_RATE_VALUES] --bs [BATCH_SIZE_VALUES] --dataset [DATASET_NAME] --discard_percentage [DISCARD_PERCENTAGE] --model [MODEL_NAME]
 ```
 
 The [ITEM] notation is used when you can insert more than 1 value for the corresponding ITEM.
