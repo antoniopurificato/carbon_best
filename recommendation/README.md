@@ -1,5 +1,11 @@
 To use the library for our experiments, follow the next steps:
 
+- If you are not located in this directory, enter:
+
+```
+cd recommendation
+```
+
 - Create the conda environment, with the required packages.
 
 ```
