@@ -27,7 +27,7 @@ cd easy_rec
 ```
 
 ```
-bash download_data.sh
+bash download_data.bash
 ```
 
 To run an experiment:
