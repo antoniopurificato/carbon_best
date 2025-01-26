@@ -20,7 +20,7 @@ from deepspeed.profiling.flops_profiler import FlopsProfiler
 from codecarbon import EmissionsTracker
 from peft import LoraConfig, get_peft_model, TaskType
 from peft import prepare_model_for_kbit_training
-from huggingface import login
+from huggingface_hub import login
 
 from src.utils.secondary_utils import *
 from src.text_model import *
