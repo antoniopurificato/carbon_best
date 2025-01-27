@@ -135,14 +135,14 @@ cfg
 
 for model in args.model:
     cfg["model"]["rec_model"]["name"] = model
-    for dataset in args.dataset[0:1]:
+    for dataset in args.dataset:
         cfg["data_params"]["name"] = dataset
-        for bs in args.bs[0:1]:
+        for bs in args.bs:
             cfg["model"]["loader_params"]["batch_size"] = bs
-            for discard_percentage in args.discard_percentage[0:1]:
+            for discard_percentage in args.discard_percentage:
                 cfg["data_params"]["percentage"] = discard_percentage
 
-                for lr in args.lr[0:1]:
+                for lr in args.lr:
 
                     cfg["model"]["optimizer"]["params"]["lr"] = lr
                 
