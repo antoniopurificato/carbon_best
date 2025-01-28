@@ -37,11 +37,17 @@ cd ../ntb
 ```
 
 ```
-python3 main_multi.py --lr [LEARNING_RATE_VALUES] --bs [BATCH_SIZE_VALUES] --dataset [DATASET_NAME] --discard_percentage [DISCARD_PERCENTAGE] --model [MODEL_NAME]
+python3 main_multi.py
 ```
 
-The [ITEM] notation is used when you can insert more than 1 value for the corresponding ITEM.
+If you run the experiments, it will create the entire knowledge base, as described in the paper (it could take months to complete all the exps).
 
-If you run the experiments without adding arguments, it will create the entire knowledge base, as described in the paper (it could take months to complete all the exps).
+If you want to select only specific configurations, you have to modify the specific config files!
+
+- Dataset $\rightarrow$ `cfg/data_params/data_cfg/name`
+- Batch size $\rightarrow$ `cfg/model/loader_params/loader_params_cfg/£batch_size`
+- Discard percentage $\rightarrow$ `cfg/data_params/data_cfg/percentage`
+- Learning rate $\rightarrow$ `cfg/model/trainer_params/trainer_params_cfg/lr`
+- Model $\rightarrow$ `cfg/model/model/rec_model`
 
 We tried to do our best to sync our experiments with a repository provided by other researchers.
