@@ -1,6 +1,6 @@
 /accelerator: cuda #cpu #cuda #cpu #mps
 /enable_checkpointing: True
-max_epochs: 4
+max_epochs: 400
 callbacks:
     - ModelCheckpoint:
         /dirpath: ${__exp__.project_folder}out/models/${__exp__.name}/
