@@ -1,7 +1,9 @@
 optimizer:
   name: Adam
   params:
-    lr: 1.0e-3
+    £lr: 
+      default: 1.0e-3
+      values: [1.0e-2,1.0e-3,1.0e-3]
   #   betas: [0.9, 0.98]
 
 loss: SequentialBCEWithLogitsLoss #SequentialCrossEntropyLoss #SequentialBPR #SequentialBCEWithLogitsLoss
