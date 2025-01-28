@@ -1,6 +1,6 @@
 £name:
   default: foursquare-tky
-  values: [ml-100k] #[amazon_beauty, ml-100k, ml-1m, steam] #the name of the dataset
+  values: [ml-100k, ml-1m, foursquare-tky, foursquare-nyc] #the name of the dataset
 /data_folder: ../data/raw/  #path of the dataset
 
 # preprocessing
