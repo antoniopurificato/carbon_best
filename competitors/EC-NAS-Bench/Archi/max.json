@@ -1,0 +1,1 @@
+{"adjacency_matrix": [[0, 1, 1, 1, 1, 0, 0], [1, 0, 1, 1, 1, 0, 0], [1, 1, 0, 1, 0, 0, 0], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]], "operations": ["conv3x3-bn-relu", "conv3x3-bn-relu", "conv3x3-bn-relu", "conv1x1-bn-relu", "conv1x1-bn-relu"], "budget": "108"}

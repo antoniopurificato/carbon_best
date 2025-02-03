@@ -1,0 +1,2 @@
+timestamp,zone_datetime,status,zone_name,carbon_intensity_avg,carbon_intensity_unit,fossilFuelPercentage
+1734365079, '2024-12-16T15:00:00.000Z', 'ok', 'US-CAL-CISO', 342, 'gCO2eq/kWh', 58.41
