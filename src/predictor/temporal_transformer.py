@@ -1,3 +1,7 @@
+"""
+This module contains the TransformerTimeSeries and TransformerPredictor classes for time series forecasting.
+"""
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
@@ -6,35 +10,60 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import csv
 import os
+import sys
+import time
+import yaml
 
 class TransformerTimeSeries(nn.Module):
-    def __init__(self, num_features, seq_len, num_targets, d_model=256, nhead=4, num_encoder_layers=4, dropout=0.1, kernel_size=3):
+    """
+    Transformer for time series data. 
+    Args:
+        num_features: Number of input features
+        seq_len: Length of the input sequence
+        num_targets: Number of target values to predict
+        d_model: Dimension of the model
+        nhead: Number of attention heads
+        num_encoder_layers: Number of encoder layers
+        dropout: Dropout rate
+        dim_feedforward: Dimension of the feedforward network
+    Returns:
+        output: Predictions for each target value
+    """
+
+    def __init__(self, num_features, seq_len, num_targets, model_config:str="src/configs/predictor_config.yaml"):
         super(TransformerTimeSeries, self).__init__()
-        self.d_model = d_model
+        self.model_config = model_config
+        self.extract_info()
         self.seq_len = seq_len
 
         # Input embedding for fixed-size input
-        self.input_embedding = nn.Linear(num_features, d_model)
-        # Convolutional layers to extract local temporal patterns
-        #self.conv1 = nn.Conv1d(in_channels=num_features, out_channels=d_model, kernel_size=kernel_size, padding=kernel_size // 2)
-        #self.conv2 = nn.Conv1d(in_channels=d_model, out_channels=d_model, kernel_size=kernel_size, padding=kernel_size // 2)
+        self.input_embedding = nn.Linear(num_features, self.d_model)
 
-        self.dropout = nn.Dropout(p=dropout)
+        #Dropout
+        self.dropout = nn.Dropout(p=self.dropout_prob)
 
         # Positional encoding for the repeated sequence
-        self.positional_encoding = nn.Parameter(torch.zeros(seq_len, d_model))
+        self.positional_encoding = nn.Parameter(torch.zeros(seq_len, self.d_model))
 
         # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=nhead, dim_feedforward=512, dropout=dropout, batch_first=True
+            d_model=self.d_model, nhead=self.nhead, dim_feedforward=self.dim_feedforward, dropout=self.dropout_prob, batch_first=True
         )
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.num_encoder_layers)
 
         # Output layer for multi-target predictions
-        self.output_layer_first = nn.Linear(d_model, 1) 
-        self.output_layer_rest = nn.Linear(d_model, 1)  
+        self.output_layer_first = nn.Linear(self.d_model, 1) 
+        self.output_layer_rest = nn.Linear(self.d_model, 1)  
                 
-                
+    def extract_info(self):
+        with open(self.model_config, "r") as config_file:
+            config = yaml.safe_load(config_file)
+        self.d_model = config['train_config']['d_model']
+        self.nhead = config['train_config']['nhead']
+        self.num_encoder_layers = config['train_config']['num_encoder_layers']
+        self.dropout_prob= config['train_config']['dropout']
+        self.dim_feedforward=config['train_config']['dim_feedforward']
+        self.lr=config['train_config']['lr']
 
     def forward(self, x, src_key_padding_mask=None):
         x = self.input_embedding(x)  # Shape: [batch_size, d_model]
@@ -54,74 +83,75 @@ class TransformerTimeSeries(nn.Module):
         # Predictions
         first_prediction = self.output_layer_first(output)
         rest_prediction = self.output_layer_rest(output)
+    
+
 
         # Combine predictions
         output = torch.cat([first_prediction, rest_prediction], dim=-1)
 
         return output
 
-# Define the PyTorch Lightning Module
 class TransformerPredictor(pl.LightningModule):
-    def __init__(self, num_features, seq_len, num_targets, d_model=256, nhead=4, num_encoder_layers=4, lr=1e-2):
+    """
+    PyTorch Lightning module for the Transformer model.
+    """
+    def __init__(self, num_features, seq_len, num_targets, model_config:str="src/configs/predictor_config.yaml"):
         super(TransformerPredictor, self).__init__()
+        self.model_config = model_config
         self.save_hyperparameters()
+        self.extract_info()
         self.train_epoch_losses = []
         self.validation_epoch_losses = []
+        self.epoch_times = []
+
 
         self.model = TransformerTimeSeries(
             num_features=num_features,
             seq_len=seq_len,
             num_targets=num_targets,
-            d_model=d_model,
-            nhead=nhead,
-            num_encoder_layers=num_encoder_layers,
+            model_config=model_config
         )
-        self.criterion = F.l1_loss #.MSELoss() # use MAE because less sensitive to outliers
+        self.criterion = F.l1_loss
         self.best_val_loss = float('inf') 
 
-        # For DWA: Maintain history of losses
+        # For DWA: maintain history of losses
         self.loss_acc_history = []
         self.loss_em_history = []
 
+        #Track computing time
+        self.epoch_start_time = None 
+
+    def extract_info(self):
+        with open(self.model_config, "r") as config_file:
+            config = yaml.safe_load(config_file)
+        self.d_model = config['train_config']['d_model']
+        self.nhead = config['train_config']['nhead']
+        self.num_encoder_layers = config['train_config']['num_encoder_layers']
+        self.dropout_prob= config['train_config']['dropout']
+        self.dim_feedforward=config['train_config']['dim_feedforward']
+        self.lr=config['train_config']['lr']
+        
     def forward(self, x, src_key_padding_mask=None):
-        """
-        Forward pass, passing masks to the model.
-        """
-        return self.model(x, src_key_padding_mask=src_key_padding_mask)
+        return self.model(x, src_key_padding_mask=src_key_padding_mask) #passing masks to the model
     
     def compute_dwa_weights(self):
         if len(self.loss_acc_history) < 2: # Minimum 2 epochs required for computing DWA
             return 0.5, 0.5  # Equal weighting initially
 
-        # rates of change
+        # Rates of change
         r_acc = self.loss_acc_history[-1] / self.loss_acc_history[-2]
         r_em = self.loss_em_history[-1] / self.loss_em_history[-2]
 
-        # normalize to sum to 1
+        # Normalize to sum to 1
         alpha_acc = r_acc / (r_acc + r_em)
         alpha_em = r_em / (r_acc + r_em)
 
         return alpha_acc, alpha_em
-    '''
-    # FOR MC Dropout 
-    def predict_with_uncertainty(self, inputs, n_samples=50):
-        self.model.train()  # Enable dropout
-        preds = []
-        with torch.no_grad():
-            for _ in range(n_samples):
-                preds.append(self.model(inputs))
-        self.model.eval()  # Disable dropout
-        preds = torch.stack(preds)  # Shape: [n_samples, batch_size, seq_len, num_targets]
-        mean_preds = preds.mean(dim=0)
-        std_preds = preds.std(dim=0)
-        return mean_preds, std_preds
-    '''
 
     def training_step(self, batch, batch_idx):
         _, inputs, labels = batch
         # Pass the mask to the model
         predictions = self(inputs)
-        #predictions = self(inputs, src_key_padding_mask=False)
         pred_acc= predictions[:, :, 0] 
         pred_em = predictions[:, :, 1] 
         label_acc = labels[:, :, 0]
@@ -140,29 +170,34 @@ class TransformerPredictor(pl.LightningModule):
         loss_acc_per_timestep = loss_acc.sum(dim=0) / (~label_padding_mask).sum(dim=0).clamp(min=1)
         loss_em_per_timestep = loss_em.sum(dim=0) / (~label_padding_mask).sum(dim=0).clamp(min=1)
 
-        # OLD: step-wise loss averaged over the batch
-        #loss_acc_per_timestep = loss_acc.mean(dim=0)  # Shape: [seq_len]
-        #loss_em_per_timestep = loss_em.mean(dim=0)  
-
-        #get weights
+        #Get weights
         alpha_acc, alpha_em = self.compute_dwa_weights()
 
         comp_loss =  alpha_acc*loss_acc_per_timestep + alpha_em*loss_em_per_timestep
-        #comp_loss =  0.7*loss_acc_per_timestep + 0.3*loss_em_per_timestep 
-        
+
         loss = comp_loss.mean()
 
-        loss_acc_mean = loss_acc.mean() #scalar
-        loss_em_mean = loss_em.mean() #scalar
+        loss_acc_mean = loss_acc.mean() 
+        loss_em_mean = loss_em.mean() 
 
         self.log("train_acc_loss", loss_acc_mean, on_step=False, on_epoch=True, prog_bar=False)
         self.log("train_em_loss", loss_em_mean, on_step=False, on_epoch=True, prog_bar=False)
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("w_acc_train", alpha_acc, on_step=True, on_epoch=True, prog_bar=False)
         self.log("w_em_train", alpha_em, on_step=True, on_epoch=True, prog_bar=False)
+
         return loss
-    
+
+    def on_train_epoch_start(self):
+        self.epoch_start_time = time.time()
+
     def on_train_epoch_end(self):
+        epoch_time = time.time() - self.epoch_start_time
+        self.epoch_times.append(epoch_time)  # Save the epoch time
+
+        # Log the epoch time to the progress bar and logs
+        self.log("epoch_time", epoch_time, on_epoch=True, prog_bar=True)
+
         train_loss = self.trainer.callback_metrics.get("train_loss", None)
         train_acc_loss = self.trainer.callback_metrics.get("train_acc_loss", None)
         train_em_loss = self.trainer.callback_metrics.get("train_em_loss", None)
@@ -188,49 +223,24 @@ class TransformerPredictor(pl.LightningModule):
         label_acc = labels[:, :, 0]
         label_em = labels[:, :, 1]
 
-        #print(f"shape pred_acc {pred_acc.shape}" )
-        #print(f"shape pred_em {pred_em.shape}" )
-        #print(f"shape label_acc {label_acc.shape}" )
-        #print(f"shape label_em {label_em.shape}" )
-
         loss_acc = self.criterion(pred_acc, label_acc, reduction='none')  
         loss_em = self.criterion(pred_em, label_em, reduction='none')  
-        #print(f"loss_acc pre-mask shape: {loss_acc.shape}")
-        #print(f"loss_em pre-mask  shape: {loss_em.shape}")
-
 
         label_padding_mask = (labels == -1).all(dim=-1).to(torch.bool)
-        #print(f"label_padding_mask shape: {label_padding_mask}")
 
-        # Mask the losses
-        loss_acc = loss_acc.masked_fill(label_padding_mask, 0)  # Set padded positions to 0
+        loss_acc = loss_acc.masked_fill(label_padding_mask, 0)  
         loss_em = loss_em.masked_fill(label_padding_mask, 0)
-        #print(f"loss_acc shape: {loss_acc.shape}")
-        #print(f"loss_em shape: {loss_em.shape}")
 
-
-        # Compute per-timestep mean (ignoring padding)
         loss_acc_per_timestep = loss_acc.sum(dim=0) / (~label_padding_mask).sum(dim=0).clamp(min=1)
         loss_em_per_timestep = loss_em.sum(dim=0) / (~label_padding_mask).sum(dim=0).clamp(min=1)
-        #print(f"loss_acc per timestep shape: {loss_acc_per_timestep.shape}")
-        #print(f"loss_em per timestep shape: {loss_em_per_timestep.shape}")
-
-       
-        #OLD:
-        #loss_acc_per_timestep = loss_acc.mean(dim=0)  
-        #loss_em_per_timestep = loss_em.mean(dim=0)  
-
 
         alpha_acc, alpha_em = self.compute_dwa_weights()
         comp_loss =  alpha_acc*loss_acc_per_timestep + alpha_em*loss_em_per_timestep 
-        #comp_loss =  0.7*loss_acc_per_timestep + 0.3*loss_em_per_timestep 
-        
         
         loss = comp_loss.mean()
         loss_acc_mean = loss_acc.mean() 
         loss_em_mean = loss_em.mean() 
 
-        # Compute baseline loss
         self.log("val_acc_loss", loss_acc_mean, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_em_loss", loss_em_mean, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
@@ -256,7 +266,7 @@ class TransformerPredictor(pl.LightningModule):
     
     def on_train_end(self):
         # File to save the losses
-        file_path = "training_validation_losses.csv"
+        file_path = "training_metrics.csv"
 
         # Define CSV header
         header = [
@@ -264,7 +274,7 @@ class TransformerPredictor(pl.LightningModule):
             "val_acc_loss", "train_acc_loss", 
             "val_em_loss", "train_em_loss", 
             "w_acc_val", "w_acc_train", 
-            "w_em_val", "w_em_train"
+            "w_em_val", "w_em_train", "epoch_time"
         ]
 
         # Write losses to CSV
@@ -273,7 +283,7 @@ class TransformerPredictor(pl.LightningModule):
             writer.writeheader()  # Write the header
 
             # Write each epoch's losses
-            for val_epoch_losses, train_epoch_losses in zip(self.validation_epoch_losses, self.train_epoch_losses):
+            for val_epoch_losses, train_epoch_losses, epoch_time in zip(self.validation_epoch_losses, self.train_epoch_losses, self.epoch_times):
                 writer.writerow({
                     "epoch": val_epoch_losses["epoch"],
                     "val_loss": val_epoch_losses["val_loss"],
@@ -286,13 +296,13 @@ class TransformerPredictor(pl.LightningModule):
                     "w_acc_train": train_epoch_losses["w_acc_train"],
                     "w_em_val": val_epoch_losses["w_em_val"],
                     "w_em_train": train_epoch_losses["w_em_train"],
+                    "epoch_time": epoch_time,
                 })
 
         print(f"Training and validation losses saved to {file_path}")
 
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adagrad(self.parameters(), lr=1e-3)
-        #optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        optimizer = torch.optim.Adagrad(self.parameters(), lr=float(self.lr))
         return optimizer
     

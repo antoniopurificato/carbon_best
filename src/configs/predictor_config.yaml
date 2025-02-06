@@ -1,0 +1,18 @@
+seed: 476
+test_config:
+  label_len:
+  - 100
+  - 5
+  - 400
+  output_dir: results_csv
+  test_names:
+  - cifar10
+  - rotten_tomatoes
+  - foursquare-tky
+train_config:
+  d_model: 256
+  dim_feedforward: 512
+  dropout: 0.1
+  lr: 0.005
+  nhead: 4
+  num_encoder_layers: 4

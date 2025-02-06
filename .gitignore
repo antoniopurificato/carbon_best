@@ -8,3 +8,10 @@ tb_logs/
 wandb/
 scripts_backup/
 features/
+src/KB
+kb_test_all_new/
+*.csv
+src/csv_results/
+src/competitors/EC-NAS/ecnas/experiments
+src/competitors/EC-NAS/ecnas/ecnas/utils/data/
+src/competitors/CE-NAS/results
