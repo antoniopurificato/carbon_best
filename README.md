@@ -24,15 +24,13 @@ conda create -n eco python=3.10
 conda activate eco
 ```
 
-- Download this repository. Since it is anonymous, it can not be cloned.
-
-- Enter in the main directory.
+- Download and unzip this repository. Since it is anonymous, it can not be cloned.
 
 ```
-cd carbon_best
+unzip carbon_best-81DE.zip
 ```
 
-- Create the `results` folder:
+- Ensure that you are in the main folder. Create the `results` folder:
 
 ```
 mkdir results
