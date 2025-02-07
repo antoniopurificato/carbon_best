@@ -82,7 +82,7 @@ def start_exp(
     )
 
     if competitors == "max" or competitors == "balanced":
-        file_na = f'src/Archi/{competitors}.json'
+        file_na = f'EC-NAS-Bench/Archi/{competitors}.json'
             with open(file_na, 'r') as f:
         data = json.load(f)
         model = LitNASBench101(data['adjacency_matrix'], data['operations'], num_classes=num_classes, lr=lr)
