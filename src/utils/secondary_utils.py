@@ -41,6 +41,8 @@ def get_all_datasets(dataset_type:str="vision") -> list:
         return ["food101", "cifar10", "cifar100", "mnist"]
     elif dataset_type == "text":
         return ["cornell-movie-review-data/rotten_tomatoes", "google/boolq", "dair-ai/emotion", "stanfordnlp/imdb"]
+    else:
+        raise ValueError("Invalid dataset type")
 
 def load_json_results(folder_path, starter='results_MAE'):
     results = []
@@ -86,54 +88,6 @@ def compute_model_params(model):
     """
     model_parameters = sum(p.numel() for p in model.parameters())
     return model_parameters
-
-
-def get_models(num_models: int = -1, models_to_ignore: list = []):
-    """
-    Retrieves a list of available model names, with an option to limit or exclude models.
-
-    Args:
-        num_models (int, optional): The number of models to retrieve. If -1, retrieves all available models.
-        models_to_ignore (list, optional): A list of model names to exclude from the result.
-
-    Returns:
-        list: A list of model names, filtered and/or limited based on the input arguments.
-    """
-    available_models = [
-        "resnet18",
-        "alexnet",
-        "vgg16",
-        "squeezenet",
-        "efficientnet",
-        "vit",
-        "BERT4Rec",
-        "CORE", 
-        "GRU4Rec",
-        "SASRec",
-        "roberta-base",
-        "microsoft_phi-2",
-        "bert-base-uncased", 
-        "mistralai_Mistral-7B-v0.3"
-    ]
-    if num_models == -1:
-        return available_models
-    else:
-        if len(models_to_ignore) > 0:
-            available_models = [
-                model for model in available_models if model not in models_to_ignore
-            ]
-            return available_models
-        else:
-            return available_models[:num_models]
-
-def get_all_datasets() -> list:
-    """
-    Returns a list of available datasets that can be used for training or evaluation.
-
-    Returns:
-        list: A list of dataset names.
-    """
-    return ["food101", "cifar10", "cifar100", "mnist"] 
 
 
 def generate_lr(start_order, end_order, num_samples, seed:int = 42):
