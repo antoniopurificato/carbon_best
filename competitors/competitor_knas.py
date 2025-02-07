@@ -85,7 +85,7 @@ class KNAS(pl.LightningModule):
         super().__init__()
         self.lr = lr
         generate_random_number = np.random.randint(0, 10)
-        results = np.load('predicted_networks.npy')
+        results = np.load('KNAS/predicted_networks.npy')
 
         self.model = NASNet(results[generate_random_number])
         self.criterion = nn.CrossEntropyLoss()
