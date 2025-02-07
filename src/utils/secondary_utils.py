@@ -38,7 +38,7 @@ def get_models(models_type:str='all'):
 
 def get_all_datasets(dataset_type:str="vision") -> list:
     if dataset_type == "vision":
-        return ["food101", "cifar10", "cifar100", "mnist"]
+        return ["food101", "cifar10", "fashionmnist", "mnist"]
     elif dataset_type == "text":
         return ["cornell-movie-review-data/rotten_tomatoes", "google/boolq", "dair-ai/emotion", "stanfordnlp/imdb"]
     else:
