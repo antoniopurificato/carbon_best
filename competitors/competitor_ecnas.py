@@ -1,6 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os
+import json
+from copy import deepcopy
+import csv
+import torch.optim as optim
+import torchvision
+import pytorch_lightning as pl
+import time
+from codecarbon import EmissionsTracker
+import eco2ai
 
 class SingleCell(nn.Module):
     def __init__(self, adjacency_matrix, operations, input_channels, output_channels):
@@ -107,18 +117,7 @@ class NASBench101FullModel(nn.Module):
 
         return x
         
-import os
-import json
-from copy import deepcopy
-import csv
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision
-import pytorch_lightning as pl
-import time
-from codecarbon import EmissionsTracker
-import eco2ai
+
 
 
 class LitNASBench101(pl.LightningModule):
