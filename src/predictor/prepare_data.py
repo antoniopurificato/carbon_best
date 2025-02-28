@@ -624,8 +624,10 @@ class ArchitectureDataset(Dataset):
         all_models = get_models()  
         results_folder = Path(load_yaml_exp_folder()[2])  
         for model_folder in results_folder.iterdir():
-            if not is_valid_model_folder(model_folder, all_models):
-                continue
+            if 'mistralai' in str(model_folder) or 'microsoft' in str(model_folder):
+                model_folder = model_folder.replace('_','/')
+                if not is_valid_model_folder(model_folder, all_models):
+                    continue
 
             model_name = model_folder.name
             for exp_folder in model_folder.iterdir():
