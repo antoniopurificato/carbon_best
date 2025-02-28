@@ -66,24 +66,15 @@ If you run the experiments without adding arguments, it will create the entire k
 0. **Libraries Installation**:
 Before starting, you have to follow the procedures of **EcoTaskSet** and install the required libraries via the command `pip3 install -r requirements.txt`.
 
-1. **Data Preparation**:
-The project starts by loading datasets using `prepare_data.py` and configuring the model settings via `predictor_config.yaml`. From the base folder run:
-
-```
-python3 -m src.predictor.prepare_data
-```
-
-If you do not have the data from the `EcoTaskSet` dataset, this script will automatically download it in the `src\KB\` folder.
-
-2. **Model Training and Prediction**:
-
+1. **Model Training and Prediction**:
+The project starts by loading datasets using `prepare_data.py` and configuring the model settings via `predictor_config.yaml`. If you do not have the data from the `EcoTaskSet` dataset, this script will automatically download it in the `src\KB\` folder.
 The model is trained using the Transformer architecture (`temporal_transformer.py`) through `train_predictor.py`. Predictions are saved for evaluation and further analysis. To run the code, use:
 
 ```
 python3 -m src.predictor.train_predictor
 ```
 
-3. **Results Extraction**:
+2. **Results Extraction**:
 
 After training is complete and checkpoints have been saved, run:
 ```
@@ -92,7 +83,7 @@ python3 -m src.predictor.extract_and_save_results
 
 This script will automatically download the pretrained `.ckpt.` files if you did not train the architecture.
 
-3b. **HPO**:
+2b. **HPO**:
 
 If you want to perform HPO (not mandatory), run:
 
@@ -100,7 +91,7 @@ If you want to perform HPO (not mandatory), run:
 python3 -m hpo_predictor --wandb_project PROJECT_NAME_OF_THE_SWEEP --wandb_key WANDB_KEY
 ```
 
-4. **Multi-Objective Optimization (MOO)**:
+3. **Multi-Objective Optimization (MOO)**:
 
 The MOO module evaluates the performance of models using Pareto-optimal metrics and rankings.
 
