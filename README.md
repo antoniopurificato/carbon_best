@@ -124,3 +124,5 @@ python3 -m src.MOO.3a_elaborate_ndcg_sova
 All the results are saved in `src\results_csv`.
 
 By following the above steps, you will be able to replicate the results presented in the paper and generate the required tables, metrics, and summaries.
+
+**WARNING**: This projcet is assuming to use a Linux machine. Since the `unzip` command is not working on Windows, replace it with the `tar -xf` command.
