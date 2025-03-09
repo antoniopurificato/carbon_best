@@ -33,7 +33,7 @@ unzip carbon_best-81DE.zip
 - Ensure that you are in the main folder. Create the `results` folder:
 
 ```
-mkdir results
+mkdir results && mkdir results_csv
 ```
 
 - Install the required libraries:
