@@ -88,7 +88,7 @@ This script will automatically download the pretrained `.ckpt.` files if you did
 If you want to perform HPO (not mandatory), run:
 
 ```
-python3 -m hpo_predictor --wandb_project PROJECT_NAME_OF_THE_SWEEP --wandb_key WANDB_KEY
+python3 -m src.predictor.hpo_predictor --wandb_project PROJECT_NAME_OF_THE_SWEEP --wandb_key WANDB_KEY
 ```
 
 3. **Multi-Objective Optimization (MOO)**:
