@@ -39,13 +39,11 @@ class TransformerTimeSeries(nn.Module):
         seq_len,
         num_targets,
         model_config: str = "src/configs/predictor_config.yaml",
-        transformer_type="performer",
     ):
         super(TransformerTimeSeries, self).__init__()
         self.model_config = model_config
         self.extract_info()
         self.seq_len = seq_len
-        self.transformer_type = transformer_type
 
         # Input embedding for fixed-size input
         self.input_embedding = nn.Linear(num_features, self.d_model)
@@ -106,6 +104,7 @@ class TransformerTimeSeries(nn.Module):
         self.dropout_prob = config["train_config"]["dropout"]
         self.dim_feedforward = config["train_config"]["dim_feedforward"]
         self.lr = config["train_config"]["lr"]
+        self.transformer_type = config["train_config"]["transformer_type"]
 
     def forward(self, x, src_key_padding_mask=None):
         x = self.input_embedding(x)
