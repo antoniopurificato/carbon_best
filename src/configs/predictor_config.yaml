@@ -16,3 +16,4 @@ train_config:
   lr: 0.005
   nhead: 4
   num_encoder_layers: 4
+  transformer_type: performer
