@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader, Dataset
 import pytorch_lightning as pl
 import csv
 import os
-import sys
 import time
 import yaml
+from datetime import datetime
 
 from src.predictor.transformer_models import *
 
@@ -337,7 +337,7 @@ class TransformerPredictor(pl.LightningModule):
 
     def on_train_end(self):
         # File to save the losses
-        file_path = "training_metrics.csv"
+        file_path = f"training_metrics_{datetime.now().strftime("%Y%m%d_%H%M")}.csv"
 
         # Define CSV header
         header = [
