@@ -63,6 +63,7 @@ def train_model_with_hpo(config=None):
     num_layers = config.layers
     d_model = config.d_model
     dim_feedforward = config.dim_feedforward
+    transformer_type = config.transformer_type
 
     with open(load_yaml_exp_folder()[0], 'rb') as handle:
         datasets_to_features = pickle.load(handle)
@@ -95,7 +96,7 @@ def train_model_with_hpo(config=None):
 
 
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_loss", dirpath = f"ckpt/hpo/{learning_rate}_{num_heads}_{num_layers}_{d_model}_{dim_feedforward}/", filename="best_model", save_top_k=1, mode="min", verbose=True
+        monitor="val_loss", dirpath = f"ckpt/hpo/{learning_rate}_{num_heads}_{num_layers}_{d_model}_{dim_feedforward}_{transformer_type}/", filename="best_model", save_top_k=1, mode="min", verbose=True
     )
     early_stopping_callback = EarlyStopping(
         monitor="val_loss", patience=15, mode="min", verbose=True
@@ -127,11 +128,17 @@ if __name__ == "__main__":
         "method": "bayes",  
         "metric": {"name": "val_loss", "goal": "minimize"},
         "parameters": {
-            "lr": {"values": [0.001, 0.005, 0.0003]},
-            "num_heads": {"values": [4, 8]},
-            "layers": {"values": [4, 8, 12]},
-            "d_model": {"values": [256, 512]},
-            "dim_feedforward": {"values": [512, 1024]},
+            #"lr": {"values": [0.001, 0.005, 0.0003]},
+            "lr": {"values": [0.005]},
+            #"num_heads": {"values": [4, 8]},
+            "num_heads": {"values": [4]},
+            #"layers": {"values": [4, 8, 12]},
+            "layers": {"values": [4]},
+            #"d_model": {"values": [256, 512]},
+            "d_model": {"values": [256]},
+            #"dim_feedforward": {"values": [512, 1024]},
+            "dim_feedforward": {"values": [512]},
+            "transformer_type": {"values": ["performer", "informer", "standard"]},
         },
     }
 
