@@ -10,20 +10,20 @@ import json
 
 def get_models(models_type:str='all'):
     available_models = [
-        "resnet18",
-        "alexnet",
-        "vgg16",
-        "squeezenet",
-        "efficientnet",
-        "vit",
-        "BERT4Rec",
-        "CORE", 
-        "GRU4Rec",
-        "SASRec",
-        "roberta-base",
-        "bert-base-uncased",
-        'microsoft/phi-2',
-        'mistralai/Mistral-7B-v0.3'
+        #"resnet18",
+        #"alexnet",
+        #"vgg16",
+        #"squeezenet",
+        #"efficientnet",
+        #"vit",
+        #"BERT4Rec",
+        #"CORE", 
+       # "GRU4Rec",
+        #"SASRec",
+        #"roberta-base",
+        #"bert-base-uncased",
+        #'microsoft_phi-2',
+        #'mistralai_Mistral-7B-v0.3'
     ]
     if models_type == "all":
         return available_models

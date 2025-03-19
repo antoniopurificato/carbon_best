@@ -10,6 +10,7 @@ scripts_backup/
 features/
 src/KB
 kb_test_all_new/
+src/KB_TEST
 *.csv
 src/csv_results/
 src/competitors/EC-NAS/ecnas/experiments

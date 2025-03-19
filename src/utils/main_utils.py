@@ -816,3 +816,12 @@ def validate_metadata(meta: dict) -> None:
         raise ValueError("Dataset name not parsed correctly.")
     if meta["discard_pct"] < 0 or meta["discard_pct"] > 100:
         raise ValueError("Discard percentage out of range (0-100).")
+
+def cosine_decay_lr(epoch, total_epochs, initial_lr=0.2):
+    """Computes the learning rate at a given epoch using cosine decay."""
+    return 0 + 0.5*(initial_lr) * (1 + np.cos(np.pi * epoch / total_epochs))
+
+def average_cosine_decay_lr(total_epochs, initial_lr=0.2):
+    """Computes the average learning rate over all epochs using cosine decay."""
+    lr_values = [cosine_decay_lr(epoch, total_epochs, initial_lr) for epoch in range(total_epochs)]
+    return np.mean(lr_values)
