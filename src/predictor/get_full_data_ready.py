@@ -55,10 +55,10 @@ if __name__ == '__main__':
 
     # Assume network_dict.json is already loaded:
     print('extracting nasbench data...')
-    with open('data.json', 'r') as file:
-        network_data = json.load(file)
-    '''with open('first_2_elements.json', 'r') as file:
+    '''with open('data.json', 'r') as file:
         network_data = json.load(file)'''
+    with open('first_2_elements.json', 'r') as file:
+        network_data = json.load(file)
 
     # Iterate over network_data 
     for idx, data_entry in enumerate(network_data):  
@@ -68,3 +68,5 @@ if __name__ == '__main__':
 
     print(f'Final dataset length: {len(full_dataset)}')
     print(f'Difference: {len(full_dataset)-original_len}, so added {int((len(full_dataset)-original_len)/4)} elements')
+    print(full_dataset.valid_data[('nb_1', 'cifar10', 100, 256, 0.10277777777777779)])
+    print(full_dataset.valid_data[('roberta-base', 'rotten_tomatoes', 0, 1, 0.001)])

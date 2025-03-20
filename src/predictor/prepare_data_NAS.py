@@ -212,6 +212,12 @@ class ArchitectureDataset(Dataset):
             padding_mask = tensor_inputs != -1  # Exclude padding values
             range_mask = torch.zeros_like(tensor_inputs, dtype=torch.bool)
             range_mask[20:122] = True  #avoid normalizing class_distribution since already normalized
+            print(f"tensor_inputs shape: {tensor_inputs.shape}")  # Expected: (1670,)
+            print(f"self.input_min shape: {self.input_min.shape}")  # Expected: (1670,)
+            print(f"self.input_max shape: {self.input_max.shape}")  # Expected: (1670,)
+            print(f"padding_mask shape: {padding_mask.shape}")  # Expected: (1670,)
+            print(f"range_mask shape: {range_mask.shape}")  # Expected: (1670,)
+            print(f"mask shape: {mask.shape}")  # This should be (1670,), but it is (1636,) (error!)
 
             # Combine both masks
             mask = padding_mask & ~range_mask
@@ -721,7 +727,8 @@ class ArchitectureDataset(Dataset):
             new_outer_key = (*outer_key[:-1], adjusted_lr)
             new_entry = {}
             
-            n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"  
+            n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"
+            print(f'n extracted: {n}')  
 
             # Parse and store model information
             new_entry.update(parse_model_info(file_path=network_data[n]["model"], is_string=True))
