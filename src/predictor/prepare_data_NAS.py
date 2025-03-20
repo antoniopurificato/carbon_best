@@ -59,9 +59,11 @@ class ArchitectureDataset(Dataset):
         """
         self.model_dict = model_dict
         self.data_dict = data_dict
-        self.data_names = {'cifar10' : 'CIFAR10', 'cifar100' : 'CIFAR100',
+        self.data_names = { 'cifar100' : 'CIFAR100',
         'mnist' : 'MNIST', 'food101' : 'food101', 'fashionmnist': 'FashionMNIST', 'google_boolq':'google_boolq' ,'stanfordnlp_imdb': 'stanfordnlp_imdb',
-        'dair-ai_emotion' : 'dair-ai_emotion', 'ml-1m': 'ML-1M', 'foursquare-nyc': 'foursquare-nyc', 'amazon-beauty': 'amazon-beauty', 'foursquare-tky': 'foursquare-tky', 'rotten_tomatoes':'rotten_tomatoes'}
+        'dair-ai_emotion' : 'dair-ai_emotion', 'ml-1m': 'ML-1M', 'foursquare-nyc': 'foursquare-nyc', 
+        'amazon-beauty': 'amazon-beauty', 
+        'cifar10' : 'CIFAR10', 'rotten_tomatoes':'rotten_tomatoes', 'foursquare-tky': 'foursquare-tky'}
         self.model_names = {'vit' : 'vit_b_16', 'efficientnet' : 'efficientnet_b0',
         'squeezenet' : 'squeezenet1_0', 'resnet18' : 'resnet18',
         'alexnet' : 'alexnet', 'vgg16' : 'vgg16', 'bert-base-uncased': 'bert-base-uncased', 'roberta-base':'roberta-base',
@@ -102,10 +104,10 @@ class ArchitectureDataset(Dataset):
             self.label_max= None
             self.compute_statistics()
         else:
-            with open("src/configs/max_padding_dict.json", "r") as json_file:
+            with open("src/configs/max_padding_dict_NAS.json", "r") as json_file:
                self.max_padding = json.load(json_file)
-
-            with open("src/configs/min_max_values_train.json", "r") as json_file:
+               
+            with open("src/configs/min_max_values_train_NAS.json", "r") as json_file:
                 loaded_data = json.load(json_file)
 
             self.input_min = torch.tensor(loaded_data["input_min"])
@@ -128,7 +130,7 @@ class ArchitectureDataset(Dataset):
 
             This method:
             1) Extracts the relevant feature fields from the dataset and pads them.
-            2) Gathers target fields (val_acc, energy_cumulative) into a label tensor.
+            2) Gathers target fields (val_acc, energy_cumulative/time_cumulative) into a label tensor.
             3) Normalizes both inputs and labels where applicable.
 
             Args:
@@ -147,7 +149,7 @@ class ArchitectureDataset(Dataset):
             value = self.valid_data[key]
 
             # Extract target tensors
-            target_keys = ['val_acc','energy_cumulative']
+            target_keys = ['val_acc', 'time_cumulative'] #'energy_cumulative']
             labels = {k: value[k] for k in target_keys if k in value}
             label_tensors = []
 
@@ -254,12 +256,12 @@ class ArchitectureDataset(Dataset):
         Computes and saves min/max statistics for both inputs and labels across the valid data.
 
         - Collects all input fields, pads them, and computes elementwise min/max (ignoring padding = -1).
-        - Collects and pads label fields (`val_acc`, `energy_cumulative`) and computes min/max ignoring padding.
+        - Collects and pads label fields (`val_acc`, `energy_cumulative`/time_cumulative) and computes min/max ignoring padding.
 
         The statistics are saved to a JSON file 'min_max_values_train_new.json' for later reuse.
         """
         all_inputs = []
-        target_keys = ['val_acc', 'energy_cumulative']
+        target_keys = ['val_acc', 'time_cumulative'] #'energy_cumulative']
 
         for key, value in self.valid_data.items():
             input_keys = [k for k in value.keys() if k not in target_keys]
@@ -269,6 +271,9 @@ class ArchitectureDataset(Dataset):
             tensor_value = torch.tensor(padded_sample, dtype=torch.float32)
             all_inputs.append(tensor_value)
 
+
+
+
         all_inputs = torch.stack(all_inputs)     
         mask = all_inputs != -1  
 
@@ -277,8 +282,12 @@ class ArchitectureDataset(Dataset):
 
         label_masks = []  
         all_labels = []
-        max_value_keys = {key: None for key in target_keys}  # Store the key for each max value
+        min_value_keys = {key: None for key in target_keys}  # Store key for each min value
+        min_values = {key: float('inf') for key in target_keys}  # Initialize min values for each label
+
+        max_value_keys = {key: None for key in target_keys}  # Store key for each max value
         max_values = {key: float('-inf') for key in target_keys}  # Initialize max values for each label
+
 
         # Iterate through valid_data and pad all labels to max length
         for key, value in self.valid_data.items():
@@ -311,6 +320,12 @@ class ArchitectureDataset(Dataset):
                         max_values[k] = max_seq_value
                         max_value_keys[k] = key  
 
+                    # Check and update the minimum value and its key
+                    min_seq_value = min(sequence)
+                    if min_seq_value < min_values[k]:
+                        min_values[k] = min_seq_value
+                        min_value_keys[k] = key  # Store the key associated with this min value
+   
             if labels:
                 stacked_labels = torch.stack(labels, dim=-1)  # Shape: (seq_len, num_targets)
                 stacked_masks = torch.stack(masks, dim=-1)  # Corresponding mask
@@ -326,7 +341,8 @@ class ArchitectureDataset(Dataset):
         else:
             self.label_min = torch.tensor([])  # 
             self.label_max = torch.tensor([])
-
+        print(f'min_value_label_keys: {min_value_keys}')
+        print(f'max_value_label_keys: {max_value_keys}')
         data_to_save = {
             "input_min": self.input_min.tolist(),
             "input_max": self.input_max.tolist(), 
@@ -342,12 +358,12 @@ class ArchitectureDataset(Dataset):
         Identifies and stores valid experiments in `self.valid_data` while logging invalid experiments in `self.invalid_experiments`.
 
         A valid experiment requires:
-          1) 'val_acc' and 'energy_cumulative' have sufficient length based on model_name.
+          1) 'val_acc' and 'energy_cumulative/time_cumulative' have sufficient length based on model_name.
           2) No NaN/Inf values in those targets.
 
         Invalid experiments are stored in `self.invalid_experiments` with details about why they're invalid.
         """
-        target_keys = ['val_acc','energy_cumulative'] 
+        target_keys =['val_acc', 'time_cumulative'] #'energy_cumulative']
         for key, value in self.entire_data.items():
            
             valid = True
@@ -537,6 +553,7 @@ class ArchitectureDataset(Dataset):
 
                 elif isinstance(value, (int, float, str)):
                     max_padding[key] = 1  # Scalars occupy a single position
+        print(max_padding)
 
         return max_padding
 
@@ -588,7 +605,8 @@ class ArchitectureDataset(Dataset):
             else:
                 emissions_data = pd.read_csv(f'{folder_name}/emissions.csv')
             emissions_codecarbon = emissions_data['emissions'].values.tolist()
-            energy=emissions_data['energy_consumed'].values.tolist()
+            #energy=emissions_data['energy_consumed'].values.tolist()
+            training_time=emissions_data['duration'].values.tolist()
             gpu_model=emissions_data['gpu_model'][0][4:]
             ram_total_size = emissions_data['ram_total_size'][0]
 
@@ -607,7 +625,8 @@ class ArchitectureDataset(Dataset):
             return (
                 torch.tensor(metrics),
                 torch.tensor(emissions_codecarbon),
-                torch.tensor(energy),
+                #torch.tensor(energy),
+                torch.tensor(training_time),
                 gpu_info,
                 cpu_info,
                 ram_total_size
@@ -665,7 +684,7 @@ class ArchitectureDataset(Dataset):
                     handle_processing_error(exp_folder, e, final_data, data_key)
 
         filtered_data = {key: value for key, value in final_data.items() if key not in ["val_acc", "test_acc"]}
-        
+ 
         return filtered_data #final_data
 
 
@@ -679,14 +698,14 @@ class ArchitectureDataset(Dataset):
         """
 
         required_keys = [
-            "val_acc", "energy_cumulative", "gpu_info", "cpu_info", "num_train_examples", 
-            "num_classes", "image_shape", "mean", "std", "class_distribution",
+            "FLOPS", "depth", "params", "discard_percentage", "batch_size", "learning_rate", 
+            "val_acc", "time_cumulative", "ram_total_size", "gpu_info", "cpu_info", 
+            "num_train_examples", "num_classes", "image_shape", "mean", "std", "class_distribution",
             "mean_dale_chall_readability_score", "density", "max_length", "num_users",
             "mean_flesch_kincaid_grade", "num_interactions", "num_items", "avg_length",
             "mean_length", "median_length", "num_val_examples", "conv_layers_NEW",
-            "fc_layers_NEW", "attention_layers_NEW", "embedding_layers_NEW", 
-            "batch_norm_layers_NEW", "layer_norm_layers_NEW", "dropout_NEW", 
-            "ram_total_size", "FLOPS", "depth", "params"
+            "fc_layers_NEW", "attention_layers_NEW", "embedding_layers_NEW", "activation_functions_NEW",
+            "batch_norm_layers_NEW", "layer_norm_layers_NEW", "dropout_NEW"
         ]
         print('adding new datapoint...')
 
@@ -702,24 +721,23 @@ class ArchitectureDataset(Dataset):
             new_outer_key = (*outer_key[:-1], adjusted_lr)
             new_entry = {}
             
-            n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"
-            print(f'n extracted: {n}')  
+            n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"  
 
             # Parse and store model information
             new_entry.update(parse_model_info(file_path=network_data[n]["model"], is_string=True))
 
             # Extract key metrics for the current experiment
-            new_entry['val_acc'] = extract_metric(input_item=network_data[n], metric_to_extract="validation_accuracy")[str(total_epochs)]
-            new_entry['training_time'] = extract_metric(input_item=network_data[n], metric_to_extract="training_time")[str(total_epochs)]
+            new_entry['val_acc'] = torch.tensor(extract_metric(input_item=network_data[n], metric_to_extract="validation_accuracy")[str(total_epochs)])
+            new_entry['time_cumulative'] = torch.tensor(extract_metric(input_item=network_data[n], metric_to_extract="training_time")[str(total_epochs)])
             new_entry['params'] = convert_to_millions(network_data[n]['num_params'])
 
             # Ensure all required keys exist, filling missing ones with appropriate defaults
             for key in required_keys:
                 if key not in new_entry:
                     if key == "gpu_info":
-                        new_entry[key] = [-1, -1, -1, -1, -1]
+                        new_entry[key] = [-1, -1, 16384, 496, -1]
                     elif key == "cpu_info":
-                        new_entry[key] = [-1, -1, -1]
+                        new_entry[key] = [64, 96, 2000000000]
                     elif key == "image_shape":
                         new_entry[key] = [-1, -1, -1]
                     elif isinstance(network_data[n].get(key, None), list):  
@@ -743,7 +761,7 @@ class ArchitectureDataset(Dataset):
                 warnings.warn(f"Dataset {outer_key[1]} not found in data_dict. Additional dataset metadata not added.")
 
             # Store the new entry in valid_data using new_outer_key as the key
-            print(f'new outer key={new_outer_key}: {new_entry}')
+            new_entry = {key: new_entry[key] for key in required_keys}
 
             self.valid_data[new_outer_key] = new_entry
 
@@ -758,7 +776,7 @@ class ArchitectureDataset(Dataset):
 
         Returns:
             dict: Dictionary of collected metrics (FLOPS, depth, params, val_acc, 
-                  energy_cumulative, etc.).
+                  energy_cumulative/time_cumulative, etc.).
         """
         # Architecture metrics
         depth, params = (-1, -1)
@@ -777,17 +795,19 @@ class ArchitectureDataset(Dataset):
 
         # Collect precomputed results
         exp_name = construct_experiment_name(meta)
-        results, emissions, energy, gpu_info, cpu_info, ram = self.obtain_precomputed_results(
+        results, emissions, time, gpu_info, cpu_info, ram = self.obtain_precomputed_results(
             model_name=meta["model_name"],
             dataset_name=meta["dataset"],
             exp_name=exp_name
         )
 
         # Potentially shortened / processed energy array
-        processed_energy = process_energy_data(energy, meta["model_name"])
+        #processed_energy = process_energy_data(energy, meta["model_name"])
+        processed_time= process_energy_data(time, meta["model_name"])
         metrics.update({
             "val_acc": results,
-            "energy_cumulative": torch.cumsum(processed_energy, dim=0),
+            #"energy_cumulative": torch.cumsum(processed_energy, dim=0),
+            "time_cumulative": torch.cumsum(processed_time, dim=0),
             "ram_total_size": ram,
             "gpu_info": self._parse_gpu_info(gpu_info),
             "cpu_info": self._parse_cpu_info(cpu_info)
@@ -821,7 +841,7 @@ class ArchitectureDataset(Dataset):
 
         # Remove unused fields if they exist
         for field in [
-            "pooling_layers", "emissions_codecarbon", "energy", 
+            "pooling_layers", "emissions_codecarbon", "energy", "training_time",
             "num_test_examples", "task"
         ]:
             final_data[key].pop(field, None)

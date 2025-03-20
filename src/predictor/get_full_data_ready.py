@@ -14,7 +14,7 @@ import time
 
 from src.utils.secondary_utils import seed_everything
 from src.utils.main_utils import *
-from src.predictor.prepare_data_new import ArchitectureDataset
+from src.predictor.prepare_data_NAS import ArchitectureDataset
 
 
 
@@ -48,23 +48,23 @@ if __name__ == '__main__':
 
     # Initialize the full dataset
     full_dataset = ArchitectureDataset(models_to_features, datasets_to_features)
-    print(len(full_dataset.valid_data))
+    original_len=len(full_dataset.valid_data)
+    print(f'len full_dataset: {original_len}')
+
+    
 
     # Assume network_dict.json is already loaded:
     print('extracting nasbench data...')
-    '''with open('data.json', 'r') as file:
+    with open('data.json', 'r') as file:
+        network_data = json.load(file)
+    '''with open('first_2_elements.json', 'r') as file:
         network_data = json.load(file)'''
-    with open('first_2_elements.json', 'r') as file:
-        network_data = json.load(file)  # Load the dictionary'''
 
+    # Iterate over network_data 
+    for idx, data_entry in enumerate(network_data):  
+        # Construct the outer_key with progressive numbering
+        outer_key = (f'nb_{idx}', 'cifar10', 100, 256, 0.2)
+        full_dataset.add_new_datapoint(outer_key, network_data)
 
-    print("First 2 elements saved to first_2_elements.json")
-
-    outer_key = ('nb_0', 'cifar10', 100, 256, 0.2)
-
-    # Add your new datapoint:
-    full_dataset.add_new_datapoint(outer_key, network_data)
-    print(f' new len_dataset: {len(full_dataset)}')
-    outer_key = ('nb_0', 'cifar10', 100, 256, 0.125)
-
-    print(full_dataset.valid_data.__getitem__(outer_key))
+    print(f'Final dataset length: {len(full_dataset)}')
+    print(f'Difference: {len(full_dataset)-original_len}, so added {int((len(full_dataset)-original_len)/4)} elements')
