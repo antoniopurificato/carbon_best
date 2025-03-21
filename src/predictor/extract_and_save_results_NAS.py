@@ -44,6 +44,10 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
         for batch in test_dataloader:
             key, inputs, labels = batch
             inputs, labels = inputs.to(device), labels.to(device)
+            print(f"NaNs in input: {torch.isnan(inputs).sum().item()}")
+            print(f"Infs in input: {torch.isinf(inputs).sum().item()}")
+            num_valid = (inputs != -1).sum().item()
+            print(f"Valid input features for {key}: {num_valid} / {inputs.numel()}")
 
             key_str = "_".join(
                 str(item[0]) if isinstance(item, tuple) else str(item.item()) if isinstance(item, torch.Tensor) else str(item)
@@ -57,8 +61,18 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
 
             split_exps.extend([{"model_name": model_name, "dataset_name": dataset_name, "data_perc": data_perc, "bs": bs, "lr": lr}] * labels.size(1))
 
-            labels = labels[:labels_limit]
-            predictions = best_model(inputs)[:labels_limit]
+            #labels = labels[:labels_limit]
+            #predictions = best_model(inputs)[:labels_limit]
+            try:
+                predictions = best_model(inputs)
+                if predictions is None:
+                    print(f"WARNING: No predictions returned for key {key_str}")
+                    continue
+                predictions = predictions[:labels_limit]
+                labels = labels[:labels_limit]
+            except Exception as e:
+                print(f"ERROR running model on key {key_str}: {e}")
+                continue
 
             test_predictions.append(predictions.cpu())
             test_labels.append(labels.cpu())
@@ -134,7 +148,13 @@ def prepare_results_dataframe(predictions, labels, split_exps, test_exps, labels
 
     df = pd.concat([original_key_strs.reset_index(drop=True), flattened_exps.reset_index(drop=True), pd.DataFrame(data)], axis=1)
     df['epoch'] = df.groupby('key_str').cumcount() + 1
-    return df[df['epoch'] <= labels_limit]
+    df= df[df['epoch'] <= labels_limit]
+
+    valid_rows = (df['epoch'] <= labels_limit) & (df['true_ACC'] != -1) & (df['true_EN'] != -1)
+    df = df[valid_rows]
+
+    return df
+
 
 if __name__ == '__main__':
     
@@ -169,7 +189,7 @@ if __name__ == '__main__':
     # Iterate over network_data 
     for idx, data_entry in enumerate(network_data):  
         # Construct the outer_key with progressive numbering
-        outer_key = (f'nb_{idx}', 'cifar10', 100, 256, 0.2)
+        outer_key = (f'nb{idx}', 'cifar10', 100, 256, 0.2)
         full_dataset.add_new_datapoint(outer_key, network_data)
 
     print(f'Final dataset length: {len(full_dataset)}')

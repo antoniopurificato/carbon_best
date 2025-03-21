@@ -33,6 +33,7 @@ import json
 import warnings
 import os
 import sys
+import re
 
 from src.utils.secondary_utils import get_models
 from src.utils.main_utils import *
@@ -203,28 +204,31 @@ class ArchitectureDataset(Dataset):
             # Extract and pad input features
             input_keys = [k for k in value.keys() if k not in target_keys]
             inputs = {k: value[k] for k in input_keys}
-
+  
             # Perform padding
             padded_inputs = self.pad_single_sample(inputs)
+            
             tensor_inputs = torch.tensor(padded_inputs, dtype=torch.float32)
+            print(f'concatenated_tensor {tensor_inputs}')
 
             # Create a mask for non-padding values
             padding_mask = tensor_inputs != -1  # Exclude padding values
             range_mask = torch.zeros_like(tensor_inputs, dtype=torch.bool)
             range_mask[20:122] = True  #avoid normalizing class_distribution since already normalized
-            print(f"tensor_inputs shape: {tensor_inputs.shape}")  # Expected: (1670,)
-            print(f"self.input_min shape: {self.input_min.shape}")  # Expected: (1670,)
-            print(f"self.input_max shape: {self.input_max.shape}")  # Expected: (1670,)
-            print(f"padding_mask shape: {padding_mask.shape}")  # Expected: (1670,)
-            print(f"range_mask shape: {range_mask.shape}")  # Expected: (1670,)
-            print(f"mask shape: {mask.shape}")  # This should be (1670,), but it is (1636,) (error!)
-
+            #print(f"tensor_inputs shape: {tensor_inputs.shape}")  # Expected: (1670,)
+            #print(f"self.input_min shape: {self.input_min.shape}")  # Expected: (1670,)
+            #print(f"self.input_max shape: {self.input_max.shape}")  # Expected: (1670,)
+            #print(f"padding_mask shape: {padding_mask.shape}")  # Expected: (1670,)
+            #print(f"range_mask shape: {range_mask.shape}")  # Expected: (1670,)
+            #print(f"mask shape: {mask.shape}")  
             # Combine both masks
             mask = padding_mask & ~range_mask
             if mask.any():
                 tensor_inputs[mask] = (tensor_inputs[mask] - self.input_min[mask]) / (
                     self.input_max[mask] - self.input_min[mask] + 1e-8)
+            torch.set_printoptions(threshold=float('inf'))
             print(f'tensor {tensor_inputs}')
+         
                 
             return key, tensor_inputs, label_tensor_norm
 
@@ -458,6 +462,7 @@ class ArchitectureDataset(Dataset):
         combined_padded_data = []
         for field, max_len in self.max_padding.items():
             if field in data_item:
+                print(f"Processing field: {field}")
                 if isinstance(data_item[field], list):
                     field_data = data_item[field]
                     flattened_field_data = []
@@ -474,6 +479,8 @@ class ArchitectureDataset(Dataset):
                             flattened_field_data.extend(sub_entry)
                         else:
                             flattened_field_data.append(sub_entry)
+
+                    print(f"Before padding [{field}]: {flattened_field_data}")
                     
                     if any(np.isnan(flattened_field_data)) or any(np.isinf(flattened_field_data)):
                         warnings.warn(f"Invalid raw data in field '{field}': {flattened_field_data}")
@@ -485,9 +492,12 @@ class ArchitectureDataset(Dataset):
                         (0, max(0, max_len - len(flattened_field_data))),
                         constant_values=-1
                     )
+                    print(f"After padding [{field}]: {padded_field.tolist()}")
                     combined_padded_data.extend(padded_field.tolist())
+                    
                 elif isinstance(data_item[field], torch.Tensor):
                     tensor_data = data_item[field].cpu().numpy().tolist()
+                    print(f"Before padding [{field}]: {tensor_data}")
                     if any(np.isnan(tensor_data)) or any(np.isinf(tensor_data)):
                         warnings.warn(f"Invalid tensor data in field '{field}': {tensor_data}")
                         pass
@@ -497,8 +507,10 @@ class ArchitectureDataset(Dataset):
                         (0, max(0, max_len - len(tensor_data))),
                         constant_values=-1
                     )
+                    print(f"After padding [{field}]: {padded_field.tolist()}")
                     combined_padded_data.extend(padded_field.tolist())
                 else:
+                    print(f"Single-value field [{field}] before padding: {data_item[field]}")
                     combined_padded_data.append(float(data_item[field]))
 
         # Append one-hot encoding for activation functions
@@ -727,9 +739,9 @@ class ArchitectureDataset(Dataset):
             new_outer_key = (*outer_key[:-1], adjusted_lr)
             new_entry = {}
             
-            n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"
-            print(f'n extracted: {n}')  
-
+            #n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"
+            n = int(re.search(r'(\d+)$', outer_key[0]).group())
+            
             # Parse and store model information
             new_entry.update(parse_model_info(file_path=network_data[n]["model"], is_string=True))
 

@@ -389,7 +389,9 @@ def parse_model_info(file_path: str, is_string: bool = False):
         "activation_functions_NEW": [],
         "dropout_NEW": [],
         "attention_layers_NEW": attention_layers,
+        "layer_norm_layers_NEW":[],
         "batch_norm_layers_NEW": [],
+        "embedding_layers_NEW": []
     }
 
     # Populate convolution layers and batch norm layers
@@ -401,10 +403,7 @@ def parse_model_info(file_path: str, is_string: bool = False):
                 "stride": layer["stride"]
             }
             model_info["conv_layers_NEW"].append(conv_layer_structured)
-        elif "num_features" in layer:  # BatchNorm2d layer
-            model_info["batch_norm_layers_NEW"].append({
-                "num_features": layer["num_features"]
-            })
+
 
     for fc in fc_layers:
         model_info["fc_layers_NEW"].append({"in_features": int(fc[0])})
@@ -430,7 +429,7 @@ if __name__ == '__main__':
         data = json.load(file)
     model_info_1 = parse_model_info(file_path=data[0]["model"], is_string=True)
     #model_info_2 = parse_layers_info(file_path=data[0]["model"], is_string=True)
-    #print(model_info_1)
+    print(model_info_1)
     #print(model_info_2)
     validation_accuracy = extract_metric(input_item = data[0], metric_to_extract="validation_accuracy")
     training_time = extract_metric(input_item = data[0], metric_to_extract="training_time")
