@@ -1,6 +1,7 @@
 import ijson
 import json
 from decimal import Decimal
+import os
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -8,9 +9,12 @@ class DecimalEncoder(json.JSONEncoder):
             return float(obj)
         return super().default(obj)
 
+output_dir = 'NAS/benchmarks/nasbench101/dataset'
+os.makedirs(output_dir, exist_ok=True)
+
 chunk_size = 10_000
-input_file = 'data_nas_bench201.json'
-output_prefix = 'data_bench201_part_'
+input_file = 'data.json'
+output_prefix = os.path.join(output_dir, 'data_part_')
 
 chunk = []
 file_index = 0

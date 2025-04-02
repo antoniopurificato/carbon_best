@@ -22,7 +22,7 @@ from NAS.predictor.prepare_data_NAS import ArchitectureDataset
 
 if __name__ == "__main__":
 
-    with open("NAS/configs/predictor_config.yaml", "r") as config_file:
+    with open("NAS/configs/predictor_config_NAS.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
 
     seed = config["seed"]

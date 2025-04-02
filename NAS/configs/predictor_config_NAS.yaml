@@ -4,7 +4,7 @@ test_config:
   - 108
   - 5
   - 400
-  output_dir: results_NAS
+  output_dir: NAS/results_NAS
   test_names:
   - cifar10
   - rotten_tomatoes

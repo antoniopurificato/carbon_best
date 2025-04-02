@@ -541,7 +541,7 @@ def convert_keys_to_python_int(d):
 
 ##########
 if __name__ == "__main__":
-    folder = "NAS/results_NAS_bench101" #chane in results_NAS as in config
+    folder = "NAS/results_NAS" #change in results_NAS as in config
     
     with open("NAS/configs/predictor_config_NAS.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
@@ -572,7 +572,7 @@ if __name__ == "__main__":
     #results=process_multiple_dfs(dfs=res_dfs, test_names=test_names, epoch_limits=epoch_limits, group_columns=["data_perc", "lr", "model_name"])
     #serializable_results = convert_to_serializable(results)
 
-   # output_file = "src/results_csv/results_MAE_test.json"
+   # output_file = "NAS/results_NAS/results_MAE_NAS_{seed}.json"
     #with open(output_file, "w") as json_file:
       #  json.dump(serializable_results, json_file, indent=4)
     #print("Computed and saved MAE results")

@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
     seed = config["seed"]
 
-    pareto_results = load_json_results("NAS/results_NAS_bench101", f"pareto_results_NAS_{seed}") #substitute with results_NAS
+    pareto_results = load_json_results("NAS/results_NAS", f"pareto_results_NAS_{seed}") #substitute with results_NAS
 
     sova_dict = {}
 
@@ -215,5 +215,6 @@ if __name__ == "__main__":
         }
 
         # Save to JSON file
-        with open(f"NAS/results_NAS_bench101/best_GREEN_NAS{seed}.json", "w") as f: #substitute with results_NAS
+        with open(f"NAS/results_NAS/best_GREEN_NAS_{seed}.json", "w") as f: #substitute with results_NAS
             json.dump(final_results, f, indent=4)
+        print(f'Best configurations saved.')

@@ -87,11 +87,11 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
 
     csv_path = f"{test_name}_{seed}_chunck_{idx}.csv"
     try:
-        test_data.to_csv(os.path.join(f'src/{output_dir}', csv_path), index=False)
-    except OSError:
-        os.mkdir(f'src/{output_dir}')
-        test_data.to_csv(os.path.join(f'src/{output_dir}', csv_path), index=False)
-    print(f"Test results for {test_name} saved to {csv_path}")
+        test_data.to_csv(os.path.join(f'{output_dir}', csv_path), index=False)
+    except OSError:        
+        os.mkdir(f'{output_dir}')
+        test_data.to_csv(os.path.join(f'{output_dir}', csv_path), index=False)
+    print(f"Test results for {test_name} saved to {csv_path} in {output_dir}")
 
     return test_data
 
@@ -171,6 +171,8 @@ if __name__ == '__main__':
     test_names = config['test_config']['test_names']
     label_len = config['test_config']['label_len']
     output_dir = config['test_config']['output_dir']
+    #os.makedirs(output_dir, exist_ok=True)
+
     ckpt_dir= f"ckpt_NAS"
     
     # General setting
@@ -184,7 +186,7 @@ if __name__ == '__main__':
     #with open('data.json', 'r') as file:
         #network_data = json.load(file)\
     
-    for n in range (0,43): 
+    for n in range (0,2): 
         file_name=f'NAS/benchmarks/nasbench101/dataset/data_part_{n}.json'
         with open(file_name, 'r') as file:
             network_data = json.load(file)
