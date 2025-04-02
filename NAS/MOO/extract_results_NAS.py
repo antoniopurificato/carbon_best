@@ -45,6 +45,9 @@ from collections import Counter
 from scipy.spatial.distance import cdist
 import json
 from datetime import date
+import os
+import glob
+import yaml
 
 class ParetoSolutions:
     """Computes Pareto fronts based on true and predicted objectives and ensures consistency 
@@ -93,7 +96,7 @@ class ParetoSolutions:
         self._validate_predicted_pareto()
 
 
-    def _is_pareto_optimal(self, objectives: pd.DataFrame, tol: float = 1e-8) -> np.ndarray:
+    def _is_pareto_optimal(self, objectives: pd.DataFrame, tol: float = 1e-6) -> np.ndarray:
         """
         Determine which rows in the DataFrame represent Pareto-optimal solutions.
 
@@ -357,13 +360,18 @@ def process_multiple_dfs(
 
     for df, test_name in zip(dfs, test_names):
         # Filter out observations where lr == 0.01
-        df = df[df["lr"] != 0.01]
+        #df = df[df["lr"] != 0.01]
+        # Cap predicted_ACC values greater than 1
+        df.loc[df['predicted_ACC'] > 1, 'predicted_ACC'] = 1
+
+        # Floor predicted_EN values less than 0
+        df.loc[df['predicted_EN'] < 0, 'predicted_EN'] = 0
+
         test_results = {}
 
         # Filter for the last epoch based on the provided limit
         epoch_limit = epoch_limits.get(test_name, None)
         if epoch_limit is not None:
-            last_epoch_df = df[df["epoch"] == epoch_limit]  # Data for the last epoch only
             df = df[df["epoch"] <= epoch_limit]  # Data for all epochs up to the limit
 
         # Calculate overall MAE (across all epochs)
@@ -376,26 +384,11 @@ def process_multiple_dfs(
         overall_mae_first = np.mean(overall_diff_first)
         overall_mae_rest = np.mean(overall_diff_rest)
 
-        # Calculate MAEs for the last epoch
-        last_epoch_mask_first = last_epoch_df["true_ACC"] != -1
-        last_epoch_mask_rest = last_epoch_df["true_EN"] != -1
-
-        last_epoch_diff_first = np.abs(
-            last_epoch_df["predicted_ACC"][last_epoch_mask_first] - last_epoch_df["true_ACC"][last_epoch_mask_first]
-        )
-        last_epoch_diff_rest = np.abs(
-            last_epoch_df["predicted_EN"][last_epoch_mask_rest] - last_epoch_df["true_EN"][last_epoch_mask_rest]
-        )
-
-        last_epoch_mae_first = np.mean(last_epoch_diff_first)
-        last_epoch_mae_rest = np.mean(last_epoch_diff_rest)
 
         # Combine overall and last-epoch MAEs under the "overall" key
         test_results["overall"] = {
             "MAE VAL_ACC": overall_mae_first,
             "MAE ENERGY": overall_mae_rest,
-            "MAE VAL_ACC LAST": last_epoch_mae_first,
-            "MAE ENERGY LAST": last_epoch_mae_rest,
         }
 
         # Calculate MAEs for each group column (for all epochs and last epoch)
@@ -405,7 +398,6 @@ def process_multiple_dfs(
             for value in df[column].unique():
                 # Filter data for the current value
                 subset = df[df[column] == value]
-                subset_last_epoch = last_epoch_df[last_epoch_df[column] == value]
 
                 # MAE for all epochs
                 subset_mask_first = subset["true_ACC"] != -1
@@ -421,30 +413,11 @@ def process_multiple_dfs(
                 subset_mae_first = np.mean(subset_diff_first)
                 subset_mae_rest = np.mean(subset_diff_rest)
 
-                # MAE for last epoch
-                subset_last_mask_first = subset_last_epoch["true_ACC"] != -1
-                subset_last_mask_rest = subset_last_epoch["true_EN"] != -1
-
-                subset_last_diff_first = np.abs(
-                    subset_last_epoch["predicted_ACC"][subset_last_mask_first] - subset_last_epoch["true_ACC"][
-                        subset_last_mask_first
-                    ]
-                )
-                subset_last_diff_rest = np.abs(
-                    subset_last_epoch["predicted_EN"][subset_last_mask_rest] - subset_last_epoch["true_EN"][
-                        subset_last_mask_rest
-                    ]
-                )
-
-                subset_last_mae_first = np.mean(subset_last_diff_first)
-                subset_last_mae_rest = np.mean(subset_last_diff_rest)
 
                 # Store results
                 column_results[value] = {
                     "MAE VAL_ACC": subset_mae_first,
-                    "MAE ENERGY": subset_mae_rest,
-                    "MAE VAL_ACC LAST": subset_last_mae_first,
-                    "MAE ENERGY LAST": subset_last_mae_rest,
+                    "MAE ENERGY": subset_mae_rest
                 }
 
             # Store results for the column
@@ -568,26 +541,41 @@ def convert_keys_to_python_int(d):
 
 ##########
 if __name__ == "__main__":
+    folder = "NAS/results_NAS_bench101" #chane in results_NAS as in config
+    
+    with open("NAS/configs/predictor_config_NAS.yaml", "r") as config_file:
+        config = yaml.safe_load(config_file)
 
-    res_vision = pd.read_csv(f"src/results_csv/cifar10_476_reb.csv") 
-    res_nlp = pd.read_csv(f"src/results_csv/rotten_tomatoes_476_reb.csv")
-    res_recsys = pd.read_csv(f"src/results_csv/foursquare_tky_476_reb.csv")
+    seed = config["seed"]
+    pattern = os.path.join(folder, f"cifar10_{seed}_chunck_*.csv")
+    print(pattern)
+    csv_files = sorted(glob.glob(pattern))
 
-    res_dfs=[res_vision, res_nlp, res_recsys]
-    test_names = ["cifar10", "rotten_tomatoes", "foursquare_tky"]
-    epoch_limits = {"cifar10": 100, "rotten_tomatoes": 5, "foursquare_tky": 400}
+
+    if not csv_files:
+        raise FileNotFoundError(f"No CSV files matched pattern: {pattern}")
+
+    print(f"Found {len(csv_files)} CSV files. Loading...")
+
+    res_dfs = [pd.read_csv(f) for f in csv_files]
+    full_df = pd.concat(res_dfs, ignore_index=True)
+
+    test_names = ["cifar10"]
+    res_dfs = [full_df]
+    test_names = ["cifar10",]
+    epoch_limits = {"cifar10": 108}
     
     #Set accuracy thresholds
-    accuracy_thresholds = [0.90, 0.45, 0.90]
+    accuracy_thresholds = [0.90]
 
     # Process multiple test results and save MAE results to JSON
-    results=process_multiple_dfs(dfs=res_dfs, test_names=test_names, epoch_limits=epoch_limits, group_columns=["data_perc", "lr", "model_name"])
-    serializable_results = convert_to_serializable(results)
+    #results=process_multiple_dfs(dfs=res_dfs, test_names=test_names, epoch_limits=epoch_limits, group_columns=["data_perc", "lr", "model_name"])
+    #serializable_results = convert_to_serializable(results)
 
-    output_file = "src/results_csv/results_MAE_test_reb.json"
-    with open(output_file, "w") as json_file:
-        json.dump(serializable_results, json_file, indent=4)
-    print("Computed and saved MAE results")
+   # output_file = "src/results_csv/results_MAE_test.json"
+    #with open(output_file, "w") as json_file:
+      #  json.dump(serializable_results, json_file, indent=4)
+    #print("Computed and saved MAE results")
 
     # Extract Pareto frontiers and metrics and save to JSON
     subsets = {}
@@ -645,13 +633,6 @@ if __name__ == "__main__":
                         swapped_metrics[metric_name] = {}
                     swapped_metrics[metric_name][level] = value
 
-            # Compute differences across Pareto sets
-            hausdorff = evaluator.hausdorff_distance()
-          
-
-            # Add differences to the swapped metrics
-            swapped_metrics["hausdorff_distance"] = {"value": hausdorff}
-
             # Add Pareto sets and metrics to the results dictionary
             pareto_results[test_name][data_perc] = {
                 "ground_truth": ground_truth_pareto,  
@@ -661,7 +642,7 @@ if __name__ == "__main__":
            
     serializable_pareto_results = convert_keys_to_python_int(convert_pareto_results_to_serializable(pareto_results))
 
-    with open("src/results_csv/pareto_results_test1.json", "w") as json_file:
+    with open(f"NAS/results_NAS/pareto_results_NAS_{seed}.json", "w") as json_file:
         json.dump(serializable_pareto_results, json_file, indent=4)
 
 

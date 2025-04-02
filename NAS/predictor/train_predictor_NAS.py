@@ -14,17 +14,15 @@ import time
 
 from src.utils.secondary_utils import seed_everything
 from src.utils.main_utils import *
-from src.predictor.temporal_transformer import TransformerPredictor
-from src.predictor.prepare_data_NAS import ArchitectureDataset
+from src.predictor.temporal_transformer_old import TransformerPredictor
+from NAS.predictor.prepare_data_NAS import ArchitectureDataset
 
-
-import deepspeed
 
 #deepspeed.init_distributed(dist_backend=None, distributed_port=29480)
 
 if __name__ == "__main__":
 
-    with open("src/configs/predictor_config.yaml", "r") as config_file:
+    with open("NAS/configs/predictor_config.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
 
     seed = config["seed"]
@@ -70,6 +68,11 @@ if __name__ == "__main__":
     train_size = int(len(full_dataset) * (1 - val_split_ratio))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    print(f"full dataset size: {len(full_dataset)}")
+    #print(f"Training set size: {len(train_dataset)}")
+    #print(f"Validation set size: {len(val_dataset)}")
+    #print("full dataset keys", full_dataset.valid_data.keys())
+
 
     # Initialize dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -102,7 +105,7 @@ if __name__ == "__main__":
 
     # Initialize the trainer
     trainer = pl.Trainer(
-        max_epochs=5,
+        max_epochs=300,
         log_every_n_steps=10,
         callbacks=[early_stopping_callback, checkpoint_callback],
         logger=True,

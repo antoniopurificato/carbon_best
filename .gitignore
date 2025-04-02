@@ -12,7 +12,13 @@ src/KB
 kb_test_all_new/
 src/KB_TEST
 *.csv
-src/csv_results/
+src/results_csv/
 src/competitors/EC-NAS/ecnas/experiments
 src/competitors/EC-NAS/ecnas/ecnas/utils/data/
 src/competitors/CE-NAS/results
+ckpt*/*
+src/2025-03-30.zip
+*.ckpt
+*.json
+src/_MACOSX/
+._ckpts_transformer

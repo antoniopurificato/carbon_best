@@ -1,10 +1,10 @@
-seed: 476
+seed: 111
 test_config:
   label_len:
-  - 100
+  - 108
   - 5
   - 400
-  output_dir: results_csv
+  output_dir: results_NAS
   test_names:
   - cifar10
   - rotten_tomatoes

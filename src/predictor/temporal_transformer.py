@@ -337,7 +337,7 @@ class TransformerPredictor(pl.LightningModule):
 
     def on_train_end(self):
         # File to save the losses
-        file_path = f"training_metrics_{datetime.now().strftime("%Y%m%d_%H%M")}.csv"
+        file_path = f"training_metrics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
 
         # Define CSV header
         header = [

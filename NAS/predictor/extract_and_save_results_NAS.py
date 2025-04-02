@@ -19,12 +19,12 @@ from datetime import date
 
 from src.utils.main_utils import *
 from src.predictor.temporal_transformer import TransformerPredictor
-from src.predictor.prepare_data_NAS import ArchitectureDataset
+from NAS.predictor.prepare_data_NAS import ArchitectureDataset
 
 #-------------------------------#
 # Methods to process tests data 
 #-------------------------------#
-def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, output_dir):
+def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, output_dir, idx):
     """
     Process the given test dataloader and save the results to a CSV file.
 
@@ -44,10 +44,10 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
         for batch in test_dataloader:
             key, inputs, labels = batch
             inputs, labels = inputs.to(device), labels.to(device)
-            print(f"NaNs in input: {torch.isnan(inputs).sum().item()}")
-            print(f"Infs in input: {torch.isinf(inputs).sum().item()}")
+            #print(f"NaNs in input: {torch.isnan(inputs).sum().item()}")
+           # print(f"Infs in input: {torch.isinf(inputs).sum().item()}")
             num_valid = (inputs != -1).sum().item()
-            print(f"Valid input features for {key}: {num_valid} / {inputs.numel()}")
+            #print(f"Valid input features for {key}: {num_valid} / {inputs.numel()}")
 
             key_str = "_".join(
                 str(item[0]) if isinstance(item, tuple) else str(item.item()) if isinstance(item, torch.Tensor) else str(item)
@@ -85,7 +85,7 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
     if test_name == 'foursquare-tky':
         test_name = "foursquare_tky"
 
-    csv_path = f"{test_name}_{seed}.csv"
+    csv_path = f"{test_name}_{seed}_chunck_{idx}.csv"
     try:
         test_data.to_csv(os.path.join(f'src/{output_dir}', csv_path), index=False)
     except OSError:
@@ -148,7 +148,7 @@ def prepare_results_dataframe(predictions, labels, split_exps, test_exps, labels
 
     df = pd.concat([original_key_strs.reset_index(drop=True), flattened_exps.reset_index(drop=True), pd.DataFrame(data)], axis=1)
     df['epoch'] = df.groupby('key_str').cumcount() + 1
-    df= df[df['epoch'] <= labels_limit]
+    df= df[df['epoch'] == 108]
 
     valid_rows = (df['epoch'] <= labels_limit) & (df['true_ACC'] != -1) & (df['true_EN'] != -1)
     df = df[valid_rows]
@@ -165,13 +165,13 @@ if __name__ == '__main__':
         models_to_features = pickle.load(handle)
 
     # Load test configurations
-    with open("src/configs/predictor_config.yaml", "r") as config_file:
+    with open("NAS/configs/predictor_config_NAS.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
 
     test_names = config['test_config']['test_names']
     label_len = config['test_config']['label_len']
     output_dir = config['test_config']['output_dir']
-    ckpt_dir= f"ckpt_NAS" #f"src/{date.today()}" #cambiare
+    ckpt_dir= f"ckpt_NAS"
     
     # General setting
     seed = config['seed']
@@ -181,65 +181,66 @@ if __name__ == '__main__':
     original_len=len(full_dataset.valid_data)
     print(f'len full_dataset: {original_len}')
 
-    '''with open('data.json', 'r') as file:
-        network_data = json.load(file)'''
-    with open('first_2_elements.json', 'r') as file:
-        network_data = json.load(file)
-
-    # Iterate over network_data 
-    for idx, data_entry in enumerate(network_data):  
-        # Construct the outer_key with progressive numbering
-        outer_key = (f'nb{idx}', 'cifar10', 100, 256, 0.2)
-        full_dataset.add_new_datapoint(outer_key, network_data)
-
-    print(f'Final dataset length: {len(full_dataset)}')
-    print(f'Difference: {len(full_dataset)-original_len}, so added {int((len(full_dataset)-original_len)/4)} elements')
-    test_data_all = full_dataset.filter_test_data(dataset_names=test_names)
+    #with open('data.json', 'r') as file:
+        #network_data = json.load(file)\
     
+    for n in range (0,43): 
+        file_name=f'NAS/benchmarks/nasbench101/dataset/data_part_{n}.json'
+        with open(file_name, 'r') as file:
+            network_data = json.load(file)
 
-    # Combine test datasets dynamically and exclude from training/validation
-    all_test_data = {key: value for test_data in test_data_all for key, value in test_data.items()}
-    print(f'test data all keys: {all_test_data.keys()}')
-    remaining_data = {key: value for key, value in full_dataset.valid_data.items() if key not in all_test_data}
-    full_dataset.valid_data = remaining_data
+        # Iterate over network_data 
+        for idx, data_entry in enumerate(network_data):  
+            count=idx+n*10000
+            # Construct the outer_key with progressive numbering
+            outer_key = (f'nb{count}', 'cifar10', 100, 256, 0.1)
+            full_dataset.add_new_datapoint(outer_key, network_data, n)
 
-    # Dynamically create test datasets and dataloaders
-    test_dataloaders = []
-    for test_data in test_data_all:
-        test_dataset = ArchitectureDataset(models_to_features, datasets_to_features)
-        test_dataset.valid_data = test_data
-        test_dataloaders.append(DataLoader(test_dataset, batch_size=1, shuffle=False))
+        print(f'Final dataset length: {len(full_dataset)}')
+        print(f'Difference: {len(full_dataset)-original_len}')
+        test_data_all = full_dataset.filter_test_data(dataset_names=test_names)
+        
 
-    # Debug: Output sizes of test datasets
-    for i, test_data in enumerate(test_data_all):
-        print(f"Test Dataset {i + 1} ({test_names[i]}) Size:", len(test_data))
+        # Combine test datasets dynamically and exclude from training/validation
+        all_test_data = {key: value for test_data in test_data_all for key, value in test_data.items()}
+        remaining_data = {key: value for key, value in full_dataset.valid_data.items() if key not in all_test_data}
+        full_dataset.valid_data = remaining_data
 
-    # Efficiently collect maximum dimensions directly
-    max_label_len = max_label_num = max_feat_num = 0
-    for dataloader in test_dataloaders:
-        for key, input, labels in dataloader:
-            max_label_len = max(max_label_len, labels.shape[1])
-            max_label_num = max(max_label_num, labels.shape[2])
-            max_feat_num = max(max_feat_num, input.shape[1])
+        # Dynamically create test datasets and dataloaders
+        test_dataloaders = []
+        for test_data in test_data_all:
+            test_dataset = ArchitectureDataset(models_to_features, datasets_to_features)
+            test_dataset.valid_data = test_data
+            test_dataloaders.append(DataLoader(test_dataset, batch_size=1, shuffle=False))
 
-    print(f"Max label length: {max_label_len}, Max label num: {max_label_num}, Max feat num: {max_feat_num}")
+        
+        # Efficiently collect maximum dimensions directly
+        max_label_len = max_label_num = max_feat_num = 0
+        for dataloader in test_dataloaders:
+            for key, input, labels in dataloader:
+                max_label_len = max(max_label_len, labels.shape[1])
+                max_label_num = max(max_label_num, labels.shape[2])
+                max_feat_num = max(max_feat_num, input.shape[1])
 
-    # Load model and prepare for evaluation
-    num_features, seq_len, num_targets = max_feat_num, max_label_len, max_label_num
-    checkpoint_path = os.path.join(ckpt_dir, f"{seed}.ckpt")
-    try:
-        best_model = TransformerPredictor.load_from_checkpoint(checkpoint_path, num_features=num_features, seq_len=seq_len, num_targets=num_targets)
-    except FileNotFoundError:
-        print("You did not train a model! I'll download a pre-trained checkpoint!")
-        zip_name = f'src/{date.today()}.zip'
-        download_data('1CGc9X7yJvRGB1eVYU7IvDr9ldYE0AkVq', zip_name)
-        os.rename('src/ckpts_transformer', f'src/{date.today()}')
-        best_model = TransformerPredictor.load_from_checkpoint(checkpoint_path, num_features=num_features, seq_len=seq_len, num_targets=num_targets)
+        print(f"Max label length: {max_label_len}, Max label num: {max_label_num}, Max feat num: {max_feat_num}")
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    best_model = best_model.to(device)
-    best_model.eval()
+        # Load model and prepare for evaluation
+        num_features, seq_len, num_targets = max_feat_num, max_label_len, max_label_num
+        checkpoint_path = os.path.join(ckpt_dir, f"{seed}.ckpt")
+        try:
+            best_model = TransformerPredictor.load_from_checkpoint(checkpoint_path, num_features=num_features, seq_len=seq_len, num_targets=num_targets)
+        except FileNotFoundError:
+            print("You did not train a model! I'll download a pre-trained checkpoint!")
+            zip_name = f'src/{date.today()}.zip'
+            download_data('1CGc9X7yJvRGB1eVYU7IvDr9ldYE0AkVq', zip_name)
+            os.rename('src/ckpts_transformer', f'src/{date.today()}')
+            best_model = TransformerPredictor.load_from_checkpoint(checkpoint_path, num_features=num_features, seq_len=seq_len, num_targets=num_targets)
 
-    # Process each test dataloader 
-    for dataloader, labels_limit, test_name in zip(test_dataloaders, label_len, test_names):
-        process_test_dataloader(dataloader, labels_limit=labels_limit, test_name=test_name, seed=seed, output_dir=output_dir)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        best_model = best_model.to(device)
+        best_model.eval()
+
+        # Process each test dataloader 
+        for dataloader, labels_limit, test_name in zip(test_dataloaders, label_len, test_names):
+            if test_name == 'cifar10':
+                process_test_dataloader(dataloader, labels_limit=labels_limit, test_name=test_name, seed=seed, output_dir=output_dir, idx=n)

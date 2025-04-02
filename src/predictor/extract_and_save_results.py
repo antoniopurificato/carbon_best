@@ -71,7 +71,7 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
     if test_name == 'foursquare-tky':
         test_name = "foursquare_tky"
 
-    csv_path = f"{test_name}_{seed}.csv"
+    csv_path = f"{test_name}_{seed}_reb.csv"
     try:
         test_data.to_csv(os.path.join(f'src/{output_dir}', csv_path), index=False)
     except OSError:
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     test_names = config['test_config']['test_names']
     label_len = config['test_config']['label_len']
     output_dir = config['test_config']['output_dir']
-    ckpt_dir= f"src/{date.today()}" #cambiare
+    ckpt_dir= f"ckpt"
     
     # General setting
     seed = config['seed']
@@ -188,7 +188,7 @@ if __name__ == '__main__':
 
     # Load model and prepare for evaluation
     num_features, seq_len, num_targets = max_feat_num, max_label_len, max_label_num
-    checkpoint_path = os.path.join(ckpt_dir, f"{seed}.ckpt")
+    checkpoint_path = os.path.join(ckpt_dir, "str(seed)_reb.ckpt")
     try:
         best_model = TransformerPredictor.load_from_checkpoint(checkpoint_path, num_features=num_features, seq_len=seq_len, num_targets=num_targets)
     except FileNotFoundError:

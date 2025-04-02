@@ -20,6 +20,30 @@ def get_infos(file_path: str, is_string:bool=False):
         validation_accuracy.append(value[metric_to_extract])
     return validation_accuracy'''
 
+def extract_metric_bench201(input_item: dict, metric_to_extract: str, total_epochs: int):
+    epochs_info = input_item.get("epochs_info", {})
+    extracted_metrics = {}
+
+    is_list_format = isinstance(epochs_info.get(metric_to_extract), list)
+    metric_values = []
+
+    if is_list_format:
+        metric_list = epochs_info.get(metric_to_extract, [])
+        for epoch in range(1, total_epochs + 1):
+            if epoch <= len(metric_list):
+                metric_values.append(metric_list[epoch - 1])
+            else:
+                metric_values.append(-1)
+    else:
+        for epoch in range(1, total_epochs + 1):
+            value = epochs_info.get(str(epoch), {}).get(metric_to_extract, -1)
+            metric_values.append(value)
+
+    extracted_metrics[str(total_epochs)] = metric_values
+    return extracted_metrics
+
+
+
 def extract_metric(input_item: dict, metric_to_extract: str):
     total_epochs = [4, 12, 36, 108]  # total epochs for each experiment
     half_epochs = {4: 2, 12: 6, 36: 18, 108: 54}  # Mapping half epochs

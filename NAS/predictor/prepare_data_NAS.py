@@ -37,7 +37,7 @@ import re
 
 from src.utils.secondary_utils import get_models
 from src.utils.main_utils import *
-from src.utils.extract_nas_model_new import *
+from NAS.predictor.extract_nas_model import *
 
 class ArchitectureDataset(Dataset):
     """
@@ -105,10 +105,10 @@ class ArchitectureDataset(Dataset):
             self.label_max= None
             self.compute_statistics()
         else:
-            with open("src/configs/max_padding_dict_NAS.json", "r") as json_file:
+            with open("NAS/configs/max_padding_dict_NAS.json", "r") as json_file:
                self.max_padding = json.load(json_file)
                
-            with open("src/configs/min_max_values_train_NAS.json", "r") as json_file:
+            with open("NAS/configs/min_max_values_train_NAS.json", "r") as json_file:
                 loaded_data = json.load(json_file)
 
             self.input_min = torch.tensor(loaded_data["input_min"])
@@ -209,25 +209,18 @@ class ArchitectureDataset(Dataset):
             padded_inputs = self.pad_single_sample(inputs)
             
             tensor_inputs = torch.tensor(padded_inputs, dtype=torch.float32)
-            print(f'concatenated_tensor {tensor_inputs}')
 
             # Create a mask for non-padding values
             padding_mask = tensor_inputs != -1  # Exclude padding values
             range_mask = torch.zeros_like(tensor_inputs, dtype=torch.bool)
             range_mask[20:122] = True  #avoid normalizing class_distribution since already normalized
-            #print(f"tensor_inputs shape: {tensor_inputs.shape}")  # Expected: (1670,)
-            #print(f"self.input_min shape: {self.input_min.shape}")  # Expected: (1670,)
-            #print(f"self.input_max shape: {self.input_max.shape}")  # Expected: (1670,)
-            #print(f"padding_mask shape: {padding_mask.shape}")  # Expected: (1670,)
-            #print(f"range_mask shape: {range_mask.shape}")  # Expected: (1670,)
-            #print(f"mask shape: {mask.shape}")  
             # Combine both masks
             mask = padding_mask & ~range_mask
             if mask.any():
                 tensor_inputs[mask] = (tensor_inputs[mask] - self.input_min[mask]) / (
                     self.input_max[mask] - self.input_min[mask] + 1e-8)
             torch.set_printoptions(threshold=float('inf'))
-            print(f'tensor {tensor_inputs}')
+            #print(f'tensor {tensor_inputs}')
          
                 
             return key, tensor_inputs, label_tensor_norm
@@ -351,8 +344,8 @@ class ArchitectureDataset(Dataset):
         else:
             self.label_min = torch.tensor([])  # 
             self.label_max = torch.tensor([])
-        print(f'min_value_label_keys: {min_value_keys}')
-        print(f'max_value_label_keys: {max_value_keys}')
+        #print(f'min_value_label_keys: {min_value_keys}')
+        #print(f'max_value_label_keys: {max_value_keys}')
         data_to_save = {
             "input_min": self.input_min.tolist(),
             "input_max": self.input_max.tolist(), 
@@ -425,7 +418,7 @@ class ArchitectureDataset(Dataset):
 
         for exp_name, details in self.invalid_experiments.items():
             warnings.warn(f"  Experiment: {exp_name}, Label shapes: {details['label_shapes']}, Invalid fields: {details.get('invalid_fields', [])}")
-        print(f'Total number of invalid experiments: {len(self.invalid_experiments)}')
+        #print(f'Total number of invalid experiments: {len(self.invalid_experiments)}')
 
     def process_dict(self, single_feature):
         """
@@ -462,7 +455,7 @@ class ArchitectureDataset(Dataset):
         combined_padded_data = []
         for field, max_len in self.max_padding.items():
             if field in data_item:
-                print(f"Processing field: {field}")
+                #print(f"Processing field: {field}")
                 if isinstance(data_item[field], list):
                     field_data = data_item[field]
                     flattened_field_data = []
@@ -480,7 +473,7 @@ class ArchitectureDataset(Dataset):
                         else:
                             flattened_field_data.append(sub_entry)
 
-                    print(f"Before padding [{field}]: {flattened_field_data}")
+                    #print(f"Before padding [{field}]: {flattened_field_data}")
                     
                     if any(np.isnan(flattened_field_data)) or any(np.isinf(flattened_field_data)):
                         warnings.warn(f"Invalid raw data in field '{field}': {flattened_field_data}")
@@ -492,12 +485,12 @@ class ArchitectureDataset(Dataset):
                         (0, max(0, max_len - len(flattened_field_data))),
                         constant_values=-1
                     )
-                    print(f"After padding [{field}]: {padded_field.tolist()}")
+                    #print(f"After padding [{field}]: {padded_field.tolist()}")
                     combined_padded_data.extend(padded_field.tolist())
                     
                 elif isinstance(data_item[field], torch.Tensor):
                     tensor_data = data_item[field].cpu().numpy().tolist()
-                    print(f"Before padding [{field}]: {tensor_data}")
+                    #print(f"Before padding [{field}]: {tensor_data}")
                     if any(np.isnan(tensor_data)) or any(np.isinf(tensor_data)):
                         warnings.warn(f"Invalid tensor data in field '{field}': {tensor_data}")
                         pass
@@ -507,10 +500,10 @@ class ArchitectureDataset(Dataset):
                         (0, max(0, max_len - len(tensor_data))),
                         constant_values=-1
                     )
-                    print(f"After padding [{field}]: {padded_field.tolist()}")
+                    #print(f"After padding [{field}]: {padded_field.tolist()}")
                     combined_padded_data.extend(padded_field.tolist())
                 else:
-                    print(f"Single-value field [{field}] before padding: {data_item[field]}")
+                    #print(f"Single-value field [{field}] before padding: {data_item[field]}")
                     combined_padded_data.append(float(data_item[field]))
 
         # Append one-hot encoding for activation functions
@@ -571,7 +564,7 @@ class ArchitectureDataset(Dataset):
 
                 elif isinstance(value, (int, float, str)):
                     max_padding[key] = 1  # Scalars occupy a single position
-        print(max_padding)
+        #print(max_padding)
 
         return max_padding
 
@@ -706,7 +699,7 @@ class ArchitectureDataset(Dataset):
         return filtered_data #final_data
 
 
-    def add_new_datapoint(self, outer_key: tuple, network_data: dict): 
+    def add_new_datapoint(self, outer_key: tuple, network_data: dict, chunck: int, bench201=False): 
         """
         Adds multiple new data points corresponding to different total epochs, adjusting learning rate with cosine decay.
 
@@ -725,29 +718,45 @@ class ArchitectureDataset(Dataset):
             "fc_layers_NEW", "attention_layers_NEW", "embedding_layers_NEW", "activation_functions_NEW",
             "batch_norm_layers_NEW", "layer_norm_layers_NEW", "dropout_NEW"
         ]
-        print('adding new datapoint...')
+        #print('adding new datapoint...')
 
         # Define the total number of epochs for each experiment
-        total_epochs_list = [4, 12, 36, 108]
+        if bench201==False: 
+            total_epochs_list = [108] #4, 12, 36,
+            lr_start=0.2
+        else: 
+            total_epochs_list = [200]
+            lr_start=0.1
         
         # Loop through each experiment with different total epochs
         for total_epochs in total_epochs_list:
+            
             # Compute the adjusted learning rate
-            adjusted_lr = average_cosine_decay_lr(total_epochs)
+            adjusted_lr = average_cosine_decay_lr(total_epochs, initial_lr=lr_start)
+        
             
             # Create a new key with modified learning rate
             new_outer_key = (*outer_key[:-1], adjusted_lr)
             new_entry = {}
             
             #n = int(outer_key[0].split('_')[-1])  # Extracts "0" from "nb_0"
-            n = int(re.search(r'(\d+)$', outer_key[0]).group())
+            count = int(re.search(r'(\d+)$', outer_key[0]).group())
+            n= count-10000*chunck
             
             # Parse and store model information
             new_entry.update(parse_model_info(file_path=network_data[n]["model"], is_string=True))
+    
 
             # Extract key metrics for the current experiment
-            new_entry['val_acc'] = torch.tensor(extract_metric(input_item=network_data[n], metric_to_extract="validation_accuracy")[str(total_epochs)])
-            new_entry['time_cumulative'] = torch.tensor(extract_metric(input_item=network_data[n], metric_to_extract="training_time")[str(total_epochs)])
+            if bench201==False: 
+                new_entry['val_acc'] = torch.tensor(extract_metric(input_item=network_data[n], metric_to_extract="validation_accuracy")[str(total_epochs)])
+                new_entry['time_cumulative'] = torch.tensor(extract_metric(input_item=network_data[n], metric_to_extract="training_time")[str(total_epochs)])
+            else: 
+                new_entry['val_acc'] = (torch.tensor(extract_metric_bench201(input_item=network_data[n], metric_to_extract="validation_accuracy", total_epochs=200)[str(total_epochs)]))/100
+                time= torch.tensor(extract_metric_bench201(input_item=network_data[n], metric_to_extract="training_time", total_epochs=200)[str(total_epochs)])
+                new_entry['time_cumulative'] = torch.cumsum(time, dim=0)
+
+
             new_entry['params'] = convert_to_millions(network_data[n]['num_params'])
 
             # Ensure all required keys exist, filling missing ones with appropriate defaults
@@ -784,7 +793,6 @@ class ArchitectureDataset(Dataset):
 
             self.valid_data[new_outer_key] = new_entry
 
- 
     def _collect_metrics(self, exp_folder: Path, meta: dict) -> dict:
         """
         Extracts model architecture metrics, energy usage, and performance results.

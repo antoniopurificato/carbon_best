@@ -99,7 +99,7 @@ if __name__ == "__main__":
     
     folder_path = "src/results_csv"
     mae_results = load_json_results(folder_path) 
-    summary_MAE_df = create_summary_table_MAE(mae_results, output_file="src/results_csv/summary_MAE_test1.csv")
+    summary_MAE_df = create_summary_table_MAE(mae_results, output_file="src/results_csv/summary_MAE_old.csv")
 
     
         

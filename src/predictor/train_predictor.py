@@ -70,6 +70,9 @@ if __name__ == "__main__":
     train_size = int(len(full_dataset) * (1 - val_split_ratio))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    print(f"full dataset size: {len(full_dataset)}")
+    print(f"Training set size: {len(train_dataset)}")
+    print(f"Validation set size: {len(val_dataset)}")
 
     # Initialize dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -91,7 +94,7 @@ if __name__ == "__main__":
     # Define the EarlyStopping callback
     early_stopping_callback = EarlyStopping(
         monitor="val_loss",  # Metric to monitor
-        patience=12,  # Number of epochs with no improvement after which training will stop
+        patience=20,  # Number of epochs with no improvement after which training will stop
         verbose=True,  # Print early stopping message
         mode="min",  # "min" because we want to minimize the validation loss
     )
