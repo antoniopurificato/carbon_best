@@ -96,7 +96,7 @@ class TransformerPredictor(pl.LightningModule):
     """
     PyTorch Lightning module for the Transformer model.
     """
-    def __init__(self, num_features, seq_len, num_targets, d_model=d_model, nhead=nhead, num_encoder_layers=num_encoder_layers, lr=lr, dim_feedforward=512):
+    def __init__(self, num_features, seq_len, num_targets, d_model=d_model, nhead=nhead, num_encoder_layers=num_encoder_layers, lr=lr, dim_feedforward=512,is_nas=False):
         super(TransformerPredictor, self).__init__()
         self.save_hyperparameters()
         self.train_epoch_losses = []
@@ -116,6 +116,7 @@ class TransformerPredictor(pl.LightningModule):
         )
         self.criterion = F.l1_loss
         self.best_val_loss = float('inf') 
+        self.is_nas = is_nas
 
         # For DWA: maintain history of losses
         self.loss_acc_history = []
@@ -271,7 +272,11 @@ class TransformerPredictor(pl.LightningModule):
         ]
 
         # Write losses to CSV
-        with open(os.path.join("results_csv", file_path), mode="w", newline="") as file:
+        if self.is_nas is not False:
+            output_d = self.is_nas
+        else:
+            output_d = "src/results_csv"
+        with open(os.path.join(output_d, file_path), mode="w", newline="") as file:
             writer = csv.DictWriter(file, fieldnames=header)
             writer.writeheader()  # Write the header
 

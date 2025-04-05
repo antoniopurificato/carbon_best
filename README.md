@@ -33,7 +33,7 @@ unzip carbon_best-81DE.zip
 - Ensure that you are in the main folder. Create the `results` folder:
 
 ```
-mkdir results && mkdir results_csv
+mkdir results && mkdir src/results_csv
 ```
 
 - Install the required libraries:
@@ -126,3 +126,5 @@ All the results are saved in `src\results_csv`.
 By following the above steps, you will be able to replicate the results presented in the paper and generate the required tables, metrics, and summaries.
 
 **WARNING**: This projcet is assuming to use a Linux machine. Since the `unzip` command is not working on Windows, replace it with the `tar -xf` command.
+
+If you want to see how NAS is working or to perform a sanity check, have a look to **additional_info.md**

@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import yaml
+import argparse
 from datetime import date
 
 from src.utils.main_utils import *
@@ -71,7 +72,9 @@ def process_test_dataloader(test_dataloader, labels_limit, test_name,seed, outpu
     if test_name == 'foursquare-tky':
         test_name = "foursquare_tky"
 
-    csv_path = f"{test_name}_{seed}_reb.csv"
+    csv_path = f"{test_name}_{seed}.csv"
+    if args.sanity_check:
+        csv_path = f"{test_name}_{seed}_sanity_check.csv"
     try:
         test_data.to_csv(os.path.join(f'src/{output_dir}', csv_path), index=False)
     except OSError:
@@ -137,6 +140,9 @@ def prepare_results_dataframe(predictions, labels, split_exps, test_exps, labels
     return df[df['epoch'] <= labels_limit]
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sanity_check", default=False, action="store_true")
+    args = parser.parse_args()
     
     # Load datasets and models features 
     with open(load_yaml_exp_folder()[0], 'rb') as handle:
@@ -188,7 +194,9 @@ if __name__ == '__main__':
 
     # Load model and prepare for evaluation
     num_features, seq_len, num_targets = max_feat_num, max_label_len, max_label_num
-    checkpoint_path = os.path.join(ckpt_dir, "str(seed)_reb.ckpt")
+    checkpoint_path = os.path.join(ckpt_dir, f"{str(seed)}.ckpt")
+    if args.sanity_check:
+        checkpoint_path = os.path.join(ckpt_dir, f"{str(seed)}_sanity_check.ckpt")
     try:
         best_model = TransformerPredictor.load_from_checkpoint(checkpoint_path, num_features=num_features, seq_len=seq_len, num_targets=num_targets)
     except FileNotFoundError:

@@ -45,6 +45,7 @@ from collections import Counter
 from scipy.spatial.distance import cdist
 import json
 from datetime import date
+import argparse
 
 class ParetoSolutions:
     """Computes Pareto fronts based on true and predicted objectives and ensures consistency 
@@ -568,10 +569,18 @@ def convert_keys_to_python_int(d):
 
 ##########
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sanity_check", default=False, action="store_true")
+    args = parser.parse_args()
 
-    res_vision = pd.read_csv(f"src/results_csv/cifar10_476_reb.csv") 
-    res_nlp = pd.read_csv(f"src/results_csv/rotten_tomatoes_476_reb.csv")
-    res_recsys = pd.read_csv(f"src/results_csv/foursquare_tky_476_reb.csv")
+    if not args.sanity_check:
+        res_vision = pd.read_csv(f"src/results_csv/cifar10_476.csv") 
+        res_nlp = pd.read_csv(f"src/results_csv/rotten_tomatoes_476.csv")
+        res_recsys = pd.read_csv(f"src/results_csv/foursquare_tky_476.csv")
+    else:
+        res_vision = pd.read_csv(f"src/results_csv/cifar10_476_sanity_check.csv") 
+        res_nlp = pd.read_csv(f"src/results_csv/rotten_tomatoes_476_sanity_check.csv")
+        res_recsys = pd.read_csv(f"src/results_csv/foursquare_tky_476_sanity_check.csv")
 
     res_dfs=[res_vision, res_nlp, res_recsys]
     test_names = ["cifar10", "rotten_tomatoes", "foursquare_tky"]
@@ -584,7 +593,9 @@ if __name__ == "__main__":
     results=process_multiple_dfs(dfs=res_dfs, test_names=test_names, epoch_limits=epoch_limits, group_columns=["data_perc", "lr", "model_name"])
     serializable_results = convert_to_serializable(results)
 
-    output_file = "src/results_csv/results_MAE_test_reb.json"
+    output_file = "src/results_csv/results_MAE_test.json"
+    if args.sanity_check:
+        output_file = "src/results_csv/results_MAE_test_sanity_check.json"
     with open(output_file, "w") as json_file:
         json.dump(serializable_results, json_file, indent=4)
     print("Computed and saved MAE results")

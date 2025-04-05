@@ -356,7 +356,7 @@ class TransformerPredictor(pl.LightningModule):
         ]
 
         # Write losses to CSV
-        with open(os.path.join("results_csv", file_path), mode="w", newline="") as file:
+        with open(os.path.join("src/results_csv", file_path), mode="w", newline="") as file:
             writer = csv.DictWriter(file, fieldnames=header)
             writer.writeheader()  # Write the header
 

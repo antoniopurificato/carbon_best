@@ -633,7 +633,6 @@ class ArchitectureDataset(Dataset):
             model_name = model_folder.name
             for exp_folder in model_folder.glob('*'):
                 
-                print(exp_folder)
                 if not process_exp_folder(exp_folder):
                     continue
 

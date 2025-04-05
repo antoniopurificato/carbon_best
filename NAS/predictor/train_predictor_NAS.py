@@ -68,11 +68,6 @@ if __name__ == "__main__":
     train_size = int(len(full_dataset) * (1 - val_split_ratio))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
-    print(f"full dataset size: {len(full_dataset)}")
-    #print(f"Training set size: {len(train_dataset)}")
-    #print(f"Validation set size: {len(val_dataset)}")
-    #print("full dataset keys", full_dataset.valid_data.keys())
-
 
     # Initialize dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -84,7 +79,7 @@ if __name__ == "__main__":
 
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
-        dirpath="ckpt_NAS",
+        dirpath="NAS/ckpt_NAS",
         filename=str(seed),
         save_top_k=1,
         mode="min",
@@ -100,7 +95,7 @@ if __name__ == "__main__":
     )
     # Initialize the model
     model = TransformerPredictor(
-        num_features=num_features, seq_len=seq_len, num_targets=num_targets
+        num_features=num_features, seq_len=seq_len, num_targets=num_targets, is_nas=config["test_config"]["output_dir"]
     )
 
     # Initialize the trainer

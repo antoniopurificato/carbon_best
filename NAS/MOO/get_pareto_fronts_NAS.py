@@ -541,12 +541,13 @@ def convert_keys_to_python_int(d):
 
 ##########
 if __name__ == "__main__":
-    folder = "NAS/results_NAS" #change in results_NAS as in config
     
     with open("NAS/configs/predictor_config_NAS.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
 
     seed = config["seed"]
+    print(config)
+    folder = config["test_config"]["output_dir"] #change in results_NAS as in config
     pattern = os.path.join(folder, f"cifar10_{seed}_chunck_*.csv")
     print(pattern)
     csv_files = sorted(glob.glob(pattern))
@@ -644,6 +645,7 @@ if __name__ == "__main__":
 
     with open(f"NAS/results_NAS/pareto_results_NAS_{seed}.json", "w") as json_file:
         json.dump(serializable_pareto_results, json_file, indent=4)
+    print("Done!")
 
 
 
