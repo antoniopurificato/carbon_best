@@ -1,7 +1,7 @@
 import torch
 import os
 from deepspeed.profiling.flops_profiler import FlopsProfiler
-from pytorch_lightning.loggers import TensorBoardLogger, CSVLogger
+from pytorch_lightning.loggers import CSVLogger
 from codecarbon import EmissionsTracker
 import time
 import yaml
@@ -11,7 +11,7 @@ import json
 from src.vision_model import EmissionsTrackingCallback
 from src.utils.secondary_utils import compute_model_params
 
-class Saver:
+class BaseSaver:
     def __init__(self, dataset:torch.utils.data.Dataset, 
                  model:torch.nn.Module,
                  learning_rate:float,
@@ -26,28 +26,9 @@ class Saver:
         self.discard = discard
 
         self.check_properties()
-        
         self.create_folders()
         self.extract_hardware_info()
 
-    def check_properties(self):
-        if not isinstance(self.dataset, torch.utils.data.Dataset):
-            raise ValueError("The dataset should be a torch.utils.data.Dataset!!")
-        if not isinstance(self.model, torch.nn.Module):
-            raise ValueError("The model should be a torch.nn.Module!!")
-        if self.discard < 1 and self.discard != 0:
-            raise ValueError("Discard must be a positive integer or zero.")
-        if not isinstance(self.learning_rate, float):
-            raise ValueError("The learning rate should be a float!!")
-        if not isinstance(self.batch_size, int):
-            raise ValueError("The batch size should be an integer!!")
-    
-    def check_saving(self, accuracy:float=None, number_of_epochs:int=0):
-        if number_of_epochs == 0:
-            raise ValueError("You should include the number of epochs!")
-        if accuracy is None or not isinstance(accuracy, float):
-            raise ValueError("You must insert the accuracy as a floating number!!")
-    
     def create_folders(self):
         model_name = self.model.__class__.__name__.lower()
         os.makedirs(os.path.join(self.output_folder, model_name), exist_ok=True)
@@ -67,6 +48,38 @@ class Saver:
         with open(os.path.join(self.output_dir, 'hardware_info.json'), 'w', encoding='utf-8') as f:
             json.dump(self.hardware_mapping, f, ensure_ascii=False, indent=4)
 
+    def check_saving(self, accuracy:float=None, number_of_epochs:int=0):
+        if number_of_epochs == 0:
+            raise ValueError("You should include the number of epochs!")
+        if accuracy is None or not isinstance(accuracy, float):
+            raise ValueError("You must insert the accuracy as a floating number!!")
+
+    def check_properties(self):
+        raise NotImplementedError("Subclasses must implement check_properties")
+
+    def start_and_get_csv_logger(self):
+        raise NotImplementedError("Subclasses must implement start_and_get_csv_logger")
+
+    def stop_and_save(self, accuracy:float=None, number_of_epochs:int=0):
+        raise NotImplementedError("Subclasses must implement stop_and_save")
+
+class CVSaver(BaseSaver):
+    def __init__(self, dataset, model, learning_rate, batch_size, image_size=None, **kwargs):
+        self.image_size = image_size
+        super().__init__(dataset, model, learning_rate, batch_size, **kwargs)
+
+    def check_properties(self):
+        if not isinstance(self.dataset, torch.utils.data.Dataset):
+            raise ValueError("The dataset should be a torch.utils.data.Dataset!!")
+        if not isinstance(self.model, torch.nn.Module):
+            raise ValueError("The model should be a torch.nn.Module!!")
+        if self.discard < 1 and self.discard != 0:
+            raise ValueError("Discard must be a positive integer or zero.")
+        if not isinstance(self.learning_rate, float):
+            raise ValueError("The learning rate should be a float!!")
+        if not isinstance(self.batch_size, int):
+            raise ValueError("The batch size should be an integer!!")
+        
     def start_and_get_csv_logger(self):
         self.profiler = FlopsProfiler(self.model)
         self.profiler.output_dir = self.output_dir
@@ -112,7 +125,6 @@ class Saver:
 
         with open(os.path.join(self.output_dir, "results.yml"), "w") as yaml_file:
             yaml.dump(emissions_res[self.output_dir], yaml_file, default_flow_style=False)
-        
 
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
@@ -203,7 +215,7 @@ if __name__ == "__main__":
     # Callbacks
 
     # Saver setup
-    saver = Saver(train_dataset, model, learning_rate=0.001, batch_size=32)
+    saver = CVSaver(train_dataset, model, learning_rate=0.001, batch_size=32)
     logger, emissions_callback = saver.start_and_get_csv_logger()
 
     # Trainer
@@ -224,4 +236,6 @@ if __name__ == "__main__":
     test_result = trainer.test(model, test_loader)
     
     # Save results
-    saver.stop_and_save(test_result[0]['test_acc'])
+    saver.stop_and_save(accuracy=test_result[0]['test_acc'], number_of_epochs=1)
+
+
