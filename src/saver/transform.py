@@ -2,37 +2,49 @@ import torch
 import os
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 from pytorch_lightning.loggers import CSVLogger
+import torch
 from codecarbon import EmissionsTracker
 import time
 import yaml
 import cpuinfo
 import json
+import pytorch_lightning as pl
 
 from src.vision_model import EmissionsTrackingCallback
 from src.utils.secondary_utils import compute_model_params
+from src.saver.extract_features import extract_features
 
 class BaseSaver:
-    def __init__(self, dataset:torch.utils.data.Dataset, 
-                 model:torch.nn.Module,
-                 learning_rate:float,
-                 batch_size:int,
-                 discard:int=0,
-                 output_folder:str="boh"):
-        self.dataset = dataset
-        self.model = model
-        self.learning_rate = learning_rate
-        self.batch_size = batch_size
+    def __init__(self, train_dataset:torch.utils.data.Dataset,
+                 test_dataset: torch.utils.data.Dataset,
+                 discard: int = 0,
+                 output_folder: str = "boh",
+                 **kwargs
+                 ):
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
         self.output_folder = output_folder
         self.discard = discard
 
         self.check_properties()
         self.create_folders()
         self.extract_hardware_info()
+        self.obtain_data_features()
+
+    def check_lightning_module(self, lightning_module):
+        if not hasattr(lightning_module, 'learning_rate'):
+            raise ValueError("Your lightning module should have a learning_rate attribute!!")
+        elif not hasattr(lightning_module, 'batch_size'):
+            raise ValueError("Your lightning module should have a batch_size attribute!!")
+        elif not hasattr(lightning_module, 'model'):
+            raise ValueError("Your lightning module should have a model attribute!!")
+        elif not hasattr(lightning_module, 'number_of_epochs'):
+            raise ValueError("Your lightning module should have a number_of_epochs attribute!!")
 
     def create_folders(self):
         model_name = self.model.__class__.__name__.lower()
         os.makedirs(os.path.join(self.output_folder, model_name), exist_ok=True)
-        dataset_name = self.dataset.__class__.__name__.lower()
+        dataset_name = self.train_dataset.__class__.__name__.lower()
         self.path_name = f"{dataset_name}_discard_{self.discard}_{self.batch_size}_{self.learning_rate}"
         self.output_dir = os.path.join(self.output_folder, model_name, self.path_name)
         os.makedirs(self.output_dir, exist_ok=True)
@@ -48,9 +60,15 @@ class BaseSaver:
         with open(os.path.join(self.output_dir, 'hardware_info.json'), 'w', encoding='utf-8') as f:
             json.dump(self.hardware_mapping, f, ensure_ascii=False, indent=4)
 
-    def check_saving(self, accuracy:float=None, number_of_epochs:int=0):
-        if number_of_epochs == 0:
-            raise ValueError("You should include the number of epochs!")
+    def obtain_data_features(self):
+        features = extract_features(train_dataset=self.train_dataset,
+                                    test_dataset=self.test_dataset,
+                                    dataset_name=self.train_dataset.__class__.__name__.lower())
+        print(features)
+
+    def check_saving(self, accuracy:float=None):
+        if self.number_of_epochs <= 0:
+            raise ValueError("You should include a valid number of epochs!")
         if accuracy is None or not isinstance(accuracy, float):
             raise ValueError("You must insert the accuracy as a floating number!!")
 
@@ -64,12 +82,26 @@ class BaseSaver:
         raise NotImplementedError("Subclasses must implement stop_and_save")
 
 class CVSaver(BaseSaver):
-    def __init__(self, dataset, model, learning_rate, batch_size, image_size=None, **kwargs):
-        self.image_size = image_size
-        super().__init__(dataset, model, learning_rate, batch_size, **kwargs)
+    def __init__(self,
+                 train_dataset:torch.utils.data.Dataset,
+                 test_dataset:torch.utils.data.Dataset,
+                 lightning_module:pl.LightningModule,
+                 **kwargs):
+
+        self.check_lightning_module(lightning_module)
+        self.learning_rate = lightning_module.learning_rate
+        self.batch_size = lightning_module.batch_size
+        self.number_of_epochs = lightning_module.number_of_epochs
+        self.model = lightning_module.model
+
+        super().__init__(train_dataset=train_dataset,
+                        test_dataset=test_dataset,
+                        **kwargs)
 
     def check_properties(self):
-        if not isinstance(self.dataset, torch.utils.data.Dataset):
+        if not isinstance(self.train_dataset, torch.utils.data.Dataset):
+            raise ValueError("The dataset should be a torch.utils.data.Dataset!!")
+        if not isinstance(self.test_dataset, torch.utils.data.Dataset):
             raise ValueError("The dataset should be a torch.utils.data.Dataset!!")
         if not isinstance(self.model, torch.nn.Module):
             raise ValueError("The model should be a torch.nn.Module!!")
@@ -98,9 +130,9 @@ class CVSaver(BaseSaver):
         self.emissions_callback = EmissionsTrackingCallback(self.output_dir)
         return logger, self.emissions_callback
 
-    def stop_and_save(self, accuracy:float=None, number_of_epochs:int=0):
+    def stop_and_save(self, accuracy:float=None):
         
-        self.check_saving(accuracy=accuracy, number_of_epochs=number_of_epochs)
+        self.check_saving(accuracy=accuracy)
         experiment_end_time = time.time()
         experiment_time = experiment_end_time - self.experiment_start_time
         self.total_emissions = self.emissions_tracker.stop()
@@ -114,39 +146,38 @@ class CVSaver(BaseSaver):
             "accuracy": accuracy,
             "num_params": compute_model_params(self.model),
             "flops": self.profiler.get_total_flops(),
-            "epochs_concluded": number_of_epochs,
+            "epochs_concluded": self.number_of_epochs,
             "experiment_time": experiment_time,
             "total_emissions": self.total_emissions,
             "emissions_per_epoch": self.emissions_callback.emissions_per_epoch,
             "times_per_epoch": self.emissions_callback.times_per_epoch,
-            "original_data_size": len(self.dataset),
-            "modified_data_size": len(self.dataset) / self.discard if self.discard != 0.0  else len(self.dataset)
+            "original_data_size": len(self.train_dataset),
+            "modified_data_size": len(self.train_dataset) / self.discard if self.discard != 0.0  else len(self.train_dataset)
         }
 
         with open(os.path.join(self.output_dir, "results.yml"), "w") as yaml_file:
             yaml.dump(emissions_res[self.output_dir], yaml_file, default_flow_style=False)
 
 import pytorch_lightning as pl
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
 import torch.nn as nn
-import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from torchvision.models import resnet18
 
 class LightningModel(pl.LightningModule):
     def __init__(self):
         super().__init__()
-        self.network = nn.Sequential(
+        self.model = nn.Sequential(
             nn.Flatten(),
             nn.Linear(784, 128),
             nn.ReLU(),
             nn.Linear(128, 10)
         )
+        self.number_of_epochs=10
+        self.learning_rate = 0.001
+        self.batch_size = 32
         
     def forward(self, x):
-        return self.network(x)
+        return self.model(x)
     
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -178,7 +209,7 @@ class LightningModel(pl.LightningModule):
         return loss
     
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=0.001)
+        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
 if __name__ == "__main__":
     import torch
@@ -199,10 +230,10 @@ if __name__ == "__main__":
     test_dataset = datasets.MNIST(root='./data', train=False, 
                                 transform=transform)
 
-    # Subset piccolissimo per test
-    train_dataset = torch.utils.data.Subset(train_dataset, range(1000))
-    val_dataset = torch.utils.data.Subset(val_dataset, range(200))
-    test_dataset = torch.utils.data.Subset(test_dataset, range(200))
+    # # Subset piccolissimo per test
+    # train_dataset = torch.utils.data.Subset(train_dataset, range(1000))
+    # val_dataset = torch.utils.data.Subset(val_dataset, range(200))
+    # test_dataset = torch.utils.data.Subset(test_dataset, range(200))
 
     # DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
@@ -215,7 +246,9 @@ if __name__ == "__main__":
     # Callbacks
 
     # Saver setup
-    saver = CVSaver(train_dataset, model, learning_rate=0.001, batch_size=32)
+    saver = CVSaver(train_dataset,
+                    test_dataset,
+                    model)
     logger, emissions_callback = saver.start_and_get_csv_logger()
 
     # Trainer
@@ -236,6 +269,6 @@ if __name__ == "__main__":
     test_result = trainer.test(model, test_loader)
     
     # Save results
-    saver.stop_and_save(accuracy=test_result[0]['test_acc'], number_of_epochs=1)
+    saver.stop_and_save(accuracy=test_result[0]['test_acc'])
 
 
