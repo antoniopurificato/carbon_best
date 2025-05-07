@@ -22,3 +22,4 @@ src/2025-03-30.zip
 *.json
 src/_MACOSX/
 ._ckpts_transformer
+src/saver/service_account.json
