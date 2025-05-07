@@ -1,11 +1,14 @@
 
 import textstat
-from collections import Counter
+from collections import Counter, defaultdict
 from typing import Optional
 from torch.utils.data import DataLoader
 
-# Some utils functions
-
+def convert_defaultdict_to_dict(d):
+    if isinstance(d, defaultdict):
+        d = {key: convert_defaultdict_to_dict(value) if isinstance(value, dict) else value for key, value in d.items()}
+        return dict(d)
+    return d
 def get_classes_distributions(dataset):
     classes = [label for _, label in dataset]
     counter = Counter(classes)
@@ -124,27 +127,14 @@ def extract_features_from_torch_dataset(train_dataset, test_dataset, dataset_nam
 
 def extract_features_from_huggingface_dataset(train_dataset, test_dataset, dataset_name, dict_of_features, label_column: Optional[str] = None):
     features = list(train_dataset.features)
-    try: 
-        # Have to do try except here because the dataset might not have a label column, and we need to check every feature singolarly
-       for feature in features:
-            # Find the output of the dataset 
-            if ('ans' not in feature or 'lab' not in feature) and label_column is None:
-               continue
-            else:
-                # Count how many different labels are in the dataset
-                output_label_name = 'answer' if 'ans' in features else 'label' if 'lab' in features else label_column
-                num_classes = len(set(train_dataset[output_label_name]))
-                # get number of samples for each class 
-                class_distribution_temp = {}
-                for i in range(num_classes):
-                    class_distribution_temp[i] = sum([1 for label in train_dataset[output_label_name] if label == i])
-
-
-            # Obtain input column
+    obtained_x, obtained_y = False, False
+    try:
+        for feature in features:
             if 'tex' in feature or 'ques' in feature:
                 input_label_name = 'text' if 'tex' in feature else 'question' if 'ques' in feature else None
                 if input_label_name is None:
-                    raise ValueError(f"Input label name not found in dataset {dataset_name}. Please contact support to add compatibility.")
+                    raise ValueError(
+                        f"Input label name not found in dataset {dataset_name}. Please contact support to add compatibility.")
 
                 num_train_examples = train_dataset.num_rows
                 num_test_examples = test_dataset.num_rows
@@ -161,18 +151,28 @@ def extract_features_from_huggingface_dataset(train_dataset, test_dataset, datas
                     readability_score = calculate_readability(train_dataset[input_label_name][i])
                     flesch_kincaid_grade += readability_score['flesch_kincaid_grade']
                     dale_chall_readability_score += readability_score['dale_chall_readability_score']
-                
+
                 # Compute the average length of the text
                 mean_length = tot_sequence_length / num_train_examples
                 mean_flesch_kincaid_grade = flesch_kincaid_grade / num_train_examples
                 mean_dale_chall_readability_score = dale_chall_readability_score / num_train_examples
                 # Compute the density of the text
+                obtained_x = True
+            if ('ans' in feature or 'lab' in feature) or label_column is not None:
+                output_label_name = 'answer' if 'ans' in feature else 'label' if 'lab' in feature else label_column
+                num_classes = len(set(train_dataset[output_label_name]))
+                # get number of samples for each class
+                class_distribution_temp = {}
+                for i in range(num_classes):
+                    class_distribution_temp[i] = sum([1 for label in train_dataset[output_label_name] if label == i])
                 class_distribution = [i / num_train_examples for i in class_distribution_temp.values()]
+                obtained_y = True
 
+            if not (obtained_x and obtained_y):
+                raise ValueError(f"You should define the name of the column containing the labels! You should choose between {features}")
     except Exception as e:
         raise ValueError(f"Error extracting features from dataset {dataset_name}: {e}. Please add the label_column or contact support to add compatibility.")
-    
-    # Store the features in the dictionary
+
     dict_of_features['num_train_examples'][dataset_name] = num_train_examples
     dict_of_features['num_test_examples'][dataset_name] = num_test_examples
     dict_of_features['num_classes'][dataset_name] = num_classes
