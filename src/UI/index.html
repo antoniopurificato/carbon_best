@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Green UI</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .loading-indicator {
+      display: none;
+      margin-left: 10px;
+      animation: spin 1.5s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .status-bar {
+      background-color: #f0f0f0;
+      padding: 5px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-size: 0.9em;
+      display: none;
+    }
+    
+    .status-bar.visible {
+      display: block;
+    }
+    
+    .compute-container {
+      display: flex;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>GREEN</h1>
+      <p>Energy-Efficient Neural Network Configuration</p>
+    </header>
+
+    <main class="content">
+      <div class="status-bar" id="status-bar">
+        System status: <span id="status-message">Ready</span>
+      </div>
+      
+      <div class="controls">
+        <!-- Dataset -->
+        <div class="box">
+          <h2 class="centered-title">Select the Dataset</h2>
+          <form id="dataset-form" class="vertical-form">
+            <label><input type="radio" name="dataset" value="cifar10"> CIFAR-10</label>
+            <label><input type="radio" name="dataset" value="foursquare_tky"> FS-TKY</label>
+            <label><input type="radio" name="dataset" value="rotten_tomatoes"> Rotten_tomatoes</label>
+          </form>
+        </div>
+
+        <!-- Trade-off -->
+        <div class="box">
+          <h2 class="centered-title">Accuracy - Emission Trade-off</h2>
+          <div class="slider-container">
+            <input type="range" min="0" max="100" value="50" id="accuracy-slider">
+            <span id="slider-value">50%</span>
+          </div>
+          <p class="note">0% = all accuracy<br>100% = all emission saved</p>
+        </div>
+      </div>
+
+      <!-- Compute button -->
+      <div class="compute-container">
+        <button type="button" id="compute-btn">Compute</button>
+        <div class="loading-indicator" id="loading-indicator">⟳</div>
+      </div>
+
+      <!-- Output -->
+      <div class="output">
+        <h2 class="centered-title">Output</h2>
+        <pre id="output-content"></pre>
+      </div>
+      
+      <!-- If initialization is needed -->
+      <div id="initialization-section" style="display: none; margin-top: 20px; text-align: center;">
+        <button type="button" id="initialize-btn" onclick="initializeSystem()">Initialize System</button>
+        <p class="note">First-time setup required.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
